@@ -399,6 +399,42 @@ Kolejność decyzji w modelu warstwowym:
 1. Najpierw sprawdzana jest warstwa `FUND` (L1, bramka go/no-go).
 2. Dopiero potem `MOMENTUM` + `TECH_ENTRY` budują finalny kierunek i siłę sygnału.
 
+#### Tagi setupów (Setup Tags)
+
+Gdy META_CONFLUENCE emituje sygnał byczży, automatycznie rozpoznaje jedną z czterech nazwanych konfiguracji wysokiej jakości i dołącza tag do logu konsoli, wiadomości Telegram oraz pola `signal_params` w bazie danych (umożliwia filtrowanie w backtestach).
+
+| Tag | Warunki | Charakterystyka |
+|-----|---------|----------------|
+| `SWING_CORE` | `FUND_OVERVIEW=BUY/STRONG_BUY` + `FUND_SCORE_PIOTROSKI=STRONG` + `TECH_REL_STRENGTH=OUTPERFORM` | Spółka fundamentalnie silna, zdrowy bilans (Piotroski ≥ 7), relatywna siła — kluczowy setup swingowy |
+| `MOMENTUM_CONT` | `FUND_EARNINGS_DRIFT=POSITIVE_DRIFT` + `TECH_REL_STRENGTH=OUTPERFORM` + `TECH_ADX=STRONG_UP` | Kontynuacja trendu po pozytywnej niespodziance wynikowej z potwierdzeniem ADX — wysoka precyzja |
+| `SQUEEZE_CONTEXT` | dowolny moduł FUND byczzy + `TECH_BOLLINGER=BUY` + `TECH_ADX=STRONG_UP` | Wybicie z konsolidacji (Bollinger squeeze) z potwierdzeniem siły trendu — setup wybiciowy |
+| `QUALITY_PULLBACK` | dowolny moduł FUND byczzy + `TECH_SUPPORT_BOUNCE=BUY` | Cofnięcie do wsparcia z technicznym sygnałem odbicia na tle pozytywnych fundamentów |
+
+Brak tagu oznacza, że sygnał jest ważny, lecz nie pasuje do żadnej z czterech nazwanych konfiguracji.
+
+Przykład logu konsoli z tagiem:
+
+```
+[META_CONFLUENCE] 🟢 BULLISH  Composite: +0.61 | FUND: +0.80 | MOMENTUM: +1.00 | TECH_ENTRY: +0.50 | 3d | 🏷 SWING_CORE
+```
+
+Przykład fragmentu wiadomości Telegram:
+
+```
+🔗 Confluence: BULLISH
+  Composite: +0.61 | FUND: +0.80 | MOMENTUM: +1.00 | TECH_ENTRY: +0.50
+  Bull: 4 | Bear: 0
+  🏷 Setup: SWING_CORE
+```
+
+Filtrowanie backtestów po tagu (SQL):
+
+```sql
+SELECT * FROM trade_signals
+WHERE module = 'META_CONFLUENCE'
+  AND json_extract(signal_params, '$.setup_tag') = 'SWING_CORE';
+```
+
 ---
 
 ### ALERT_PRICE_CHANGE
