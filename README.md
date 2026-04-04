@@ -382,6 +382,23 @@ Konfiguracja (nowa): `confluence_criteria.lookback_days`, `module_weights`, `mod
 
 Fallback: jeśli nie zdefiniujesz mapowania kategorii (`module_category_map` + `category_weights`), moduł przechodzi do starszego trybu sumowania wag (`min_signals`).
 
+#### Jak interpretować komunikaty na konsoli (META_CONFLUENCE)
+
+- `🟢 BULLISH` / `🟢🟢 STRONG_BULLISH` = praktyczny odpowiednik kierunku BUY po agregacji sygnałów (nie jest to literalny sygnał `BUY`, tylko sygnał meta).
+- `🔴 BEARISH` / `🔴🔴 STRONG_BEARISH` = praktyczny odpowiednik kierunku SELL/AVOID po agregacji.
+- `⚪ BELOW THRESHOLD` = composite nie przekroczył `composite_threshold`; traktuj jako brak przewagi (`NO-TRADE`).
+- `🚫 L1 GATE` = warstwa FUND (Layer 1) zablokowała sygnał mimo wskazań warstwy technicznej.
+
+Przykład:
+
+- `Bullish blocked — FUND: +0.00 ≤ 0.00` oznacza, że FUND nie potwierdził kierunku long przy `layer1_min_score: 0.0`.
+- W tym modelu warto traktować taki przypadek jako `WAIT` / obserwację, a nie wejście.
+
+Kolejność decyzji w modelu warstwowym:
+
+1. Najpierw sprawdzana jest warstwa `FUND` (L1, bramka go/no-go).
+2. Dopiero potem `MOMENTUM` + `TECH_ENTRY` budują finalny kierunek i siłę sygnału.
+
 ---
 
 ### ALERT_PRICE_CHANGE
