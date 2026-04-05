@@ -234,7 +234,7 @@ Konfiguracja: `relative_strength_criteria.lookback_months`, `outperform_pct`, `u
 
 Ocenia kondycję fundamentalną spółki systemem punktowym (0–100+).
 
-**Dane:** Yahoo Finance — cena, C/Z, P/B, ROE, D/E, FCF, wyniki finansowe, historia dywidend, cele analityków
+**Dane:** BiznesRadar (domyślnie), Yahoo Finance lub StockAnalysis — cena, C/Z, P/B, ROE, D/E, FCF, wyniki finansowe, historia dywidend, cele analityków
 
 #### Tabela punktowa
 
@@ -242,6 +242,8 @@ Ocenia kondycję fundamentalną spółki systemem punktowym (0–100+).
 |-----------|-----------|--------|
 | Stopa dywidendy | 20 | ≥ 6%: 20 pkt \| ≥ 3%: 10 pkt |
 | Regularne dywidendy (3 lata) | 5 | Bonus: dywidenda > 0 każdego roku |
+| Ryzyko cięcia dywidendy | −5 | Kara: forward yield < 70% trailing annual yield |
+| Stabilność dywidendy | 5 | Bonus: trailing yield ≥ 90% średniej 5-letniej i payout ≤ 85% |
 | C/Z (trailing P/E) | 20 | < 8: 20 \| < 12: 15 \| < 15: 10 \| < 20: 5 |
 | DCF upside | 15 | ≥ 30%: 15 \| ≥ 10%: 10 \| > 0: 5 |
 | Cel analityków (upside) | 10 | ≥ 20%: 10 \| ≥ 10%: 7 \| > 0: 3 |
@@ -654,6 +656,8 @@ tickers:
       isin: "PLOPTTC00011"
       keywords: ["CD\\s*PROJEKT\\w*"]
       buy_alert: 240.0
+      fund_provider: "biznesradar"
+      biznesradar_id: "CD-PROJEKT"
 ```
 
 Obsługiwane pola zależne od modułu:
@@ -665,8 +669,17 @@ Obsługiwane pola zależne od modułu:
 - `buy_alert_action` — akcja po osiągnięciu poziomu buy (`once`, `once_daily`, `adjust:...`)
 - `sell_alert_action` — akcja po osiągnięciu poziomu sell (`once`, `once_daily`, `adjust:...`)
 - `alert_threshold`
+- `fund_provider` — opcjonalne nadpisanie dostawcy danych fundamentalnych dla konkretnej spółki (`biznesradar`, `yahoo`, `stockanalysis`)
+- `biznesradar_id` — identyfikator spółki na portalu BiznesRadar (wymagany, jeśli różni się od tickera)
 
 ## Konfiguracja analizatorów
+
+### Fundamenty (FUND_OVERVIEW)
+
+```yaml
+fundamental_criteria:
+  default_fund_provider: "biznesradar"  # Globalny domyślny dostawca: biznesradar, yahoo, stockanalysis
+```
 
 ### Luki cenowe (TECH_GAPS)
 
