@@ -19,6 +19,7 @@ StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznyc
 | `FUND_OVERVIEW` | Fundamentalna | BUY / HOLD / WAIT (scoring 0–100) |
 | `FUND_SCORE_PIOTROSKI` | Fundamentalna | STRONG (7-9) / WEAK (0-4) |
 | `FUND_EARNINGS_DRIFT` | Fundamentalna | POSITIVE DRIFT / NEGATIVE DRIFT |
+| `META_AI_VERDICT` | Meta (AI Hybrid) | STRONG_BUY / BUY / HOLD / SELL |
 | `META_CONFLUENCE` | Meta | STRONG_BULLISH / BULLISH / STRONG_BEARISH / BEARISH (MIXED = brak emisji sygnalu) |
 | `ALERT_PRICE_CHANGE` | Alert | UP / DOWN |
 | `ALERT_PRICE_LEVEL` | Alert | BUY / SELL |
@@ -361,7 +362,7 @@ Meta-analizator agregujący sygnały ze wszystkich pozostałych modułów dla da
 
 Aktualna logika działa warstwowo (2-layer scoring), zamiast prostego liczenia liczby sygnałów:
 
-1. Warstwa 1 (decyzja TAK/NIE): kategorie fundamentalne, np. Piotroski / PEAD / FUND_OVERVIEW / FUND_AI_FAIR_VALUE.
+1. Warstwa 1 (decyzja TAK/NIE): kategorie fundamentalne, np. Piotroski / PEAD / FUND_OVERVIEW.
 2. Warstwa 2 (timing): momentum i wejście techniczne, np. RS / ADX / Bollinger / Support Bounce.
 
 Sygnał końcowy jest liczony jako ważona kompozycja kategorii (domyślnie FUND 50%, MOMENTUM 30%, TECH_ENTRY 20%).
@@ -437,6 +438,28 @@ SELECT * FROM trade_signals
 WHERE module = 'META_CONFLUENCE'
   AND json_extract(signal_params, '$.setup_tag') = 'SWING_CORE';
 ```
+
+---
+
+### META_AI_VERDICT
+
+Hybrydowy moduł decyzyjny AI. Nie liczy wskaźników od zera.
+
+Zamiast tego:
+1. Pobiera najnowsze sygnały modułowe z tabeli `trade_signals` (z ostatnich N dni).
+2. Buduje ustrukturyzowany prompt z twardymi wejściami (moduł, sygnał, confidence, timestamp).
+3. Prosi model AI o finalny werdykt w formacie JSON: `STRONG_BUY | BUY | HOLD | SELL`.
+
+**Ważne:** `META_AI_VERDICT` jest celowo wykluczony z wejścia `META_CONFLUENCE`, żeby uniknąć pętli zwrotnej (AI -> confluence -> AI).
+
+| Werdykt | Zachowanie |
+|--------|------------|
+| `STRONG_BUY` | zapis jako trade signal (`STRONG BUY`) |
+| `BUY` | zapis jako trade signal (`BUY`) |
+| `SELL` | zapis jako trade signal (`SELL`) |
+| `HOLD` | alert informacyjny (bez zapisu trade signal) |
+
+Konfiguracja: `ai_verdict_criteria` (`lookback_days`, `max_signals`, `min_signals`, `model_name`, `temperature`, `top_p`, `prompt_template`).
 
 ---
 
@@ -827,6 +850,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `FUND_OVERVIEW`
 - `FUND_EARNINGS_DRIFT`
 - `FUND_SCORE_PIOTROSKI`
+- `META_AI_VERDICT`
 - `META_CONFLUENCE`
 - `REPORT_MORNING_BRIEF`
 - `TECH_ADX`
@@ -839,7 +863,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `TECH_SUPPORT_BOUNCE`
 - `TECH_VOLUME`
 
-Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
+Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
 
 ## Przyklady CLI
 
