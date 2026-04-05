@@ -41,6 +41,7 @@ Obsługiwane komendy:
 - `/wycena TICKER`
 - `/arkusz TICKER`
 - `/fundamenty TICKER`
+- `/signal TICKER SIGNAL [MODULE] [NOTATKA]` — ręczny zapis sygnału do `trade_signals` (np. po analizie AI w WWW)
 - `/run MODULE_NAME` — natychmiastowe uruchomienie wybranego modułu (np. `/run TECH_DIVERGENCE`)
 
 Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `409` przy `getUpdates`.
@@ -794,6 +795,11 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
+- `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`)
+- `--register-signal <S>` - sygnał do zapisu (np. `BUY`, `SELL`, `HOLD`)
+- `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
+- `--register-note <TXT>` - notatka opisująca kontekst decyzji
+- `--register-price <P>` - cena wejścia; gdy brak, system pobiera ostatni close z Yahoo
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -847,6 +853,9 @@ python stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT_PRI
 
 # backfill luk cenowych dla 6 miesiecy
 python stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
+
+# ręczny zapis sygnału BUY po promptcie AI z WWW
+python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-note "AI WWW daily pick"
 
 # backtest sygnalow BUY/SELL z eksportem CSV
 python stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
