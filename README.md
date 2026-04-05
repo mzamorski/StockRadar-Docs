@@ -43,6 +43,7 @@ Obsługiwane komendy:
 - `/arkusz TICKER`
 - `/fundamenty TICKER`
 - `/signal TICKER SIGNAL [MODULE] [NOTATKA]` — ręczny zapis sygnału do `trade_signals` (np. po analizie AI w WWW); model dodajesz tokenem `ai:MODEL`
+- `/ai_batch [TREŚĆ]` — hurtowy zapis rekomendacji wygenerowanych przez AI w WWW w formacie `TICKER: REKOMENDACJA | powód`
 - `/run MODULE_NAME` — natychmiastowe uruchomienie wybranego modułu (np. `/run TECH_DIVERGENCE`)
 
 Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `409` przy `getUpdates`.
@@ -825,6 +826,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--register-note <TXT>` - notatka opisująca kontekst decyzji
 - `--register-price <P>` - cena wejścia; gdy brak, system pobiera ostatni close z Yahoo
 - `--register-ai-model <N>` - nazwa modelu AI do statystyk (np. `gemini-2.5-flash`, `gpt-5.4-nano`)
+- `--register-ai-batch <PATH>` - wczytuje zbiorcze wyniki AI z pliku tekstowego (format: `TICKER: REKOMENDACJA | powód`)
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
