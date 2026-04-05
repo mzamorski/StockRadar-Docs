@@ -41,7 +41,7 @@ Obsługiwane komendy:
 - `/wycena TICKER`
 - `/arkusz TICKER`
 - `/fundamenty TICKER`
-- `/signal TICKER SIGNAL [MODULE] [NOTATKA]` — ręczny zapis sygnału do `trade_signals` (np. po analizie AI w WWW)
+- `/signal TICKER SIGNAL [MODULE] [NOTATKA]` — ręczny zapis sygnału do `trade_signals` (np. po analizie AI w WWW); model dodajesz tokenem `ai:MODEL`
 - `/run MODULE_NAME` — natychmiastowe uruchomienie wybranego modułu (np. `/run TECH_DIVERGENCE`)
 
 Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `409` przy `getUpdates`.
@@ -800,6 +800,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
 - `--register-note <TXT>` - notatka opisująca kontekst decyzji
 - `--register-price <P>` - cena wejścia; gdy brak, system pobiera ostatni close z Yahoo
+- `--register-ai-model <N>` - nazwa modelu AI do statystyk (np. `gemini-2.5-flash`, `gpt-5.4-nano`)
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -857,6 +858,9 @@ python stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.
 # ręczny zapis sygnału BUY po promptcie AI z WWW
 python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-note "AI WWW daily pick"
 
+# ręczny zapis sygnału BUY z nazwą modelu AI
+python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-note "AI WWW daily pick"
+
 # backtest sygnalow BUY/SELL z eksportem CSV
 python stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
 
@@ -865,6 +869,20 @@ python stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --ba
 
 # backtest z analiza AI wynikow (tryb api = odpowiedz z modelu; tryb prompt = gotowy prompt na Telegram)
 python stock_radar.py --backtest-trade-signals --backtest-export backtest_results.csv --backtest-ai-analysis
+```
+
+Przy ręcznym zapisie nazwa modelu trafia do `trade_signals.signal_params.ai_model`.
+Możesz to potem agregować, np.:
+
+```sql
+SELECT
+  json_extract(signal_params, '$.ai_model') AS ai_model,
+  COUNT(*) AS signals
+FROM trade_signals
+WHERE module = 'REPORT_AI_DAILY_PICK'
+  AND signal IN ('BUY', 'SELL', 'HOLD')
+GROUP BY ai_model
+ORDER BY signals DESC;
 ```
 
 ## Zasady backtestu trade_signals
