@@ -791,7 +791,8 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--ignore-schedule` - ignoruje `active_hours` i uruchamia aktywne moduly niezaleznie od okien czasu
 - `--silent` - tryb cichy: brak logow konsolowych i brak powiadomien Telegram; sygnaly i dane dalej trafiaja do SQLite
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
-- `--ticker <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US`)
+- `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
+- `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US`)
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
