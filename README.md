@@ -366,8 +366,9 @@ Aktualna logika działa warstwowo (2-layer scoring), zamiast prostego liczenia l
 1. Warstwa 1 (decyzja TAK/NIE): kategorie fundamentalne, np. Piotroski / PEAD / FUND_OVERVIEW.
 2. Warstwa 2 (timing): momentum i wejście techniczne, np. RS / ADX / Bollinger / Support Bounce.
 
-Sygnał końcowy jest liczony jako ważona kompozycja kategorii (domyślnie FUND 50%, MOMENTUM 30%, TECH_ENTRY 20%).
+Sygnał końcowy jest liczony jako ważona kompozycja kategorii (domyślnie FUND 35%, MOMENTUM 45%, TECH_ENTRY 20%).
 Warstwa 1 pełni rolę bramki: jeśli FUND nie potwierdza kierunku, sygnał jest blokowany.
+Dodatkowo działa kara konfliktu (value-trap guard): gdy FUND jest dodatni, ale MOMENTUM wyraźnie ujemne, composite jest obniżany.
 
 **Dane:** tabela `trade_signals` w SQLite (ostatnie N dni)
 
@@ -380,10 +381,10 @@ Warstwa 1 pełni rolę bramki: jeśli FUND nie potwierdza kierunku, sygnał jest
 | ⚪ BRAK SYGNAŁU | Wynik poniżej progu lub blokada przez Layer 1 |
 
 Klasyfikacja sygnałów:
-- **Bycze:** BUY, STRONG BUY, STRONG (Piotroski), OUTPERFORM (RS), POSITIVE_DRIFT (PEAD), STRONG_UP (ADX), HOLD
+- **Bycze:** BUY, STRONG BUY, STRONG (Piotroski), OUTPERFORM (RS), POSITIVE_DRIFT (PEAD), STRONG_UP (ADX)
 - **Niedźwiedzie:** SELL, WEAK (Piotroski), UNDERPERFORM (RS), NEGATIVE_DRIFT (PEAD), STRONG_DOWN (ADX)
 
-Konfiguracja (nowa): `confluence_criteria.lookback_days`, `module_weights`, `module_category_map`, `category_weights`, `layer1_categories`, `layer1_min_score`, `composite_threshold`.
+Konfiguracja (nowa): `confluence_criteria.lookback_days`, `module_weights`, `module_category_map`, `category_weights`, `layer1_categories`, `layer1_min_score`, `composite_threshold`, `conflict_penalty`.
 
 Fallback: jeśli nie zdefiniujesz mapowania kategorii (`module_category_map` + `category_weights`), moduł przechodzi do starszego trybu sumowania wag (`min_signals`).
 
@@ -393,10 +394,11 @@ Fallback: jeśli nie zdefiniujesz mapowania kategorii (`module_category_map` + `
 - `🔴 BEARISH` / `🔴🔴 STRONG_BEARISH` = praktyczny odpowiednik kierunku SELL/AVOID po agregacji.
 - `⚪ BELOW THRESHOLD` = composite nie przekroczył `composite_threshold`; traktuj jako brak przewagi (`NO-TRADE`).
 - `🚫 L1 GATE` = warstwa FUND (Layer 1) zablokowała sygnał mimo wskazań warstwy technicznej.
+- `⚠️ CONFLICT PENALTY` = aktywna kara konfliktu FUND vs MOMENTUM obniżyła composite.
 
 Przykład:
 
-- `Bullish blocked — FUND: +0.00 ≤ 0.00` oznacza, że FUND nie potwierdził kierunku long przy `layer1_min_score: 0.0`.
+- `Bullish blocked — FUND: +0.20 ≤ 0.20` oznacza, że FUND nie potwierdził kierunku long przy `layer1_min_score: 0.2`.
 - W tym modelu warto traktować taki przypadek jako `WAIT` / obserwację, a nie wejście.
 
 Kolejność decyzji w modelu warstwowym:
@@ -738,12 +740,16 @@ confluence_criteria:
   lookback_days: 3
   min_signals: 3            # fallback dla starego trybu (bez kategorii)
   layer1_categories: [FUND]
-  layer1_min_score: 0.0
+  layer1_min_score: 0.2
   composite_threshold: 0.2
   category_weights:
-    FUND: 0.50
-    MOMENTUM: 0.30
+    FUND: 0.35
+    MOMENTUM: 0.45
     TECH_ENTRY: 0.20
+  conflict_penalty:
+    enabled: true
+    momentum_negative_threshold: -0.3
+    penalty: 0.4
 ```
 
 ## Sesja i deduplikacja
