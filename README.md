@@ -685,6 +685,7 @@ tickers:
       buy_alert: 240.0
       fund_provider: "biznesradar"
       biznesradar_id: "CD-PROJEKT"
+      priority: "high"
 ```
 
 Obsługiwane pola zależne od modułu:
