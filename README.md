@@ -815,6 +815,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `silent service`: po podaniu `--silent` aplikacja nie wypisuje logow na konsolę i nie wysyła Telegrama; dalej zapisuje sygnaly i stan do bazy
 - `backfill gaps`: po podaniu `--backfill-gaps` aplikacja wykona backfill i zakonczy proces
 - `backtest trade_signals`: po podaniu `--backtest-trade-signals` aplikacja uruchomi backtest i zakonczy proces
+- `signals chart`: po podaniu `--signals-chart-days` aplikacja wygeneruje dwustronny wykres siły rynkowej (byki vs niedźwiedzie) i zakończy proces
 
 ## Wszystkie argumenty CLI
 
@@ -845,6 +846,10 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-signals <S1,S2,...>` - filtr po polu `signal` (np. `BUY,SELL`)
 - `--backtest-export <PATH.csv>` - eksport CSV wynikow backtestu, rankingow modulow i raportow confidence buckets
 - `--backtest-ai-analysis` - po zakonczeniu backtestu wysyla wyniki do AI (Gemini/OpenAI) w celu analizy; w trybie `prompt` dostarcza gotowy prompt na Telegram
+- `--signals-chart-days <D>` - wygeneruj i wyświetl w konsoli dwustronny wykres słupkowy sygnałów z ostatnich D dni
+- `--signals-chart-modules <M1,M2,...>` - wymuś na wykresie konkretne moduły (zamiast domyślnych z rolą `signal`)
+- `--debug` - uruchamia aplikację w trybie debugowania (więcej logów i szczegółów)
+- `--help` - wyświetla w konsoli listę wszystkich dostępnych komend
 
 ## Dostepne moduly (`AnalysisModule`)
 
@@ -903,6 +908,12 @@ python stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --ba
 
 # backtest z analiza AI wynikow (tryb api = odpowiedz z modelu; tryb prompt = gotowy prompt na Telegram)
 python stock_radar.py --backtest-trade-signals --backtest-export backtest_results.csv --backtest-ai-analysis
+
+# wyświetlenie wykresu sygnałów z ostatnich 14 dni dla wszystkich modułów (z rolą signal)
+python stock_radar.py --signals-chart-days 14
+
+# wyświetlenie wykresu sygnałów z 30 dni tylko dla konkretnych modułów
+python stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
 ```
 
 Przy ręcznym zapisie nazwa modelu trafia do `trade_signals.signal_params.ai_model`.
