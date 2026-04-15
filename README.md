@@ -255,6 +255,7 @@ Ocenia kondycję fundamentalną spółki systemem punktowym (0–100+).
 | Dług/Kapitał (D/E) | 10 | < 50%: 10 \| < 100%: 5 |
 | Current Ratio | 5 | ≥ 1.5: 5 \| ≥ 1.0: 2 |
 | Kwartalny zysk netto q/q | 5 | ≥ 20%: 5 \| ≥ 0%: 2 \| spadek: 0 |
+| FCF Yield (Wolne Przepływy) | −5 do +15 | ≥ 10%: 15 \| ≥ 5%: 10 \| > 0: 5 \| < 0: −5 |
 
 **Fair Value upside** bazuje na composite fair value — **medianie** z zastosowanych modeli wyceny:
 
@@ -1006,6 +1007,34 @@ Uwagi:
 - backtest moze filtrowac sygnaly po `--backtest-min-confidence`
 - raport backtestu buduje buckety: `00_49`, `50_64`, `65_79`, `80_plus`, `unknown`
 - buckety sa raportowane lacznie, per horyzont, oraz rankingowane po `win_rate`, potem po `avg_directional_return_pct`
+
+## 💡 Baza Wiedzy (Mechaniki Wyceny w Systemie)
+
+StockRadar nie jest tylko prostym skanerem wskaźników. Posiada wbudowane mechanizmy chroniące kapitał i faworyzujące zdrowe biznesy rynkowe.
+
+### 1. Spółki Wzrostowe (Growth) vs Value (Ukryty PEG Ratio)
+Często spółka z P/E = 10 rosnąca o 40% r/r jest lepszą inwestycją niż spółka z P/E = 5, której zyski spadają. 
+Choć system nie raportuje wprost wskaźnika **PEG (Price/Earnings to Growth)**, jego wewnętrzna logika matematycznie go naśladuje. Moduł `FUND_OVERVIEW` przyznaje osobne punkty za "taniość" (Trailing P/E) oraz potężne premie za "dynamikę" (Zysk netto r/r oraz kw/kw). Dodatkowo, wbudowany model 2-fazowego DCF estymuje solidne tempo wzrostu (mediana z dynamiki przychodów i zysków), co naturalnie podbija Wartość Godziwą (Fair Value) dynamicznie rosnących biznesów.
+
+### 2. Rentowność Wolnych Przepływów (FCF Yield)
+Zyski księgowe można sztucznie "masować" operacjami papierowymi, ale żywa gotówka na koncie nie kłamie. `FCF Yield` (Free Cash Flow / Market Cap) to bezkompromisowy wskaźnik pokazujący rentowność wolnej gotówki.
+- **FCF Yield > 10%:** Wybitnie tania "maszyna gotówkowa". Spółka w teorii mogłaby całkowicie spłacić swoją kapitalizację rynkową w 10 lat z samej nadwyżki finansowej. System mocno premiuje to zjawisko (+15 pkt).
+- **FCF Yield < 0%:** Spółka "przepala" gotówkę (mimo np. papierowego zysku netto). System nakłada karę (-5 pkt), chroniąc portfel przed firmami na kroplówce finansowej.
+
+### 3. Ochrona przed Value Traps (Pułapkami Wartości)
+Tanie spółki często są tanie nie bez powodu (np. zwijający się biznes, problemy z długiem). StockRadar broni się przed nimi na trzy sposoby:
+- **Audyt Piotroskiego:** Bada jakość księgową (m.in. czy zyskom towarzyszą przepływy operacyjne CFO). Jeśli F-Score wynosi 0-4, włącza się ostrzeżenie i punkty za taniość zostają zneutralizowane słabym audytem.
+- **Odcięcie Grahama:** Model B. Grahama świetnie wycenia dojrzałe, nudne biznesy, ale zaniża wartość spółek technologicznych i innowacyjnych. System identyfikuje profil spółki i automatycznie ignoruje ten model w agregacji (FV), jeżeli P/E spółki przekracza 25.
+- **Bramka Meta-Confluence:** Moduły techniczne (RSI, MACD, wybicia) **nie mogą** wygenerować silnego sygnału `KUPUJ` z poziomu warstwy `META_CONFLUENCE`, jeśli warstwa fundamentalna (FUND) odradza wejście (jest słaba/negatywna). Fundamenty muszą dać "zielone światło" timingowi technicznemu.
+
+### 4. Cache AI i Dynamiczny Upside
+Zapytania do LLM (sztucznej inteligencji) o Wartość Godziwą w module `AIFairValueAnalyzer` są kosztowne czasowo i zużywają limity API. Biorąc pod uwagę fakt, że fundamenty spółki zmieniają się zazwyczaj tylko 4 razy w roku (po publikacji raportu kwartalnego), ciągłe odpytywanie AI nie ma sensu.
+Dlatego system:
+1. Zapisuje (cachuje) surową wycenę dokonaną przez AI (np. na 7-30 dni zgodnie z configiem `fair_value_cache_days`).
+2. Przy każdym uruchomieniu skanera błyskawicznie wczytuje te wartości.
+3. Pobiera z giełdy **najświeższą cenę w czasie rzeczywistym** i w ułamku sekundy na nowo przelicza aktualny potencjał wzrostu (Upside %). 
+
+Jeżeli wciągu 3 dni spółka urosła o 20%, jej status w cache'u dynamicznie przekształci się z `Undervalued` na `Overvalued`, bez wysyłania zbędnego promtu do serwerów Google Gemini / OpenAI.
 
 ## Wymagane sekcje config.yaml
 
