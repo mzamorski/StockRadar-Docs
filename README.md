@@ -738,6 +738,7 @@ tickers:
       isin: "PLOPTTC00011"
       keywords: ["CD\\s*PROJEKT\\w*"]
       buy_alert: 240.0
+      enabled: false  # opcjonalnie: false, aby tymczasowo wyłączyć analizę
       fund_provider: "biznesradar"
       biznesradar_id: "CD-PROJEKT"
       priority: "high"
@@ -747,6 +748,7 @@ Obsługiwane pola zależne od modułu:
 
 - `keywords`
 - `isin`
+- `enabled` - opcjonalnie: ustaw na `false`, aby tymczasowo wyłączyć spółkę z automatycznych analiz (domyślnie `true`).
 - `buy_alert`
 - `sell_alert`
 - `buy_alert_action` — akcja po osiągnięciu poziomu buy (`once`, `once_daily`, `adjust:...`)
