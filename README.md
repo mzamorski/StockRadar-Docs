@@ -16,6 +16,7 @@ StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznyc
 | `TECH_BOLLINGER` | Techniczna | BUY / SELL / WAIT |
 | `TECH_ADX` | Techniczna | STRONG↑ / STRONG↓ / BUILDING / WEAK |
 | `TECH_REL_STRENGTH` | Techniczna | OUTPERFORM / UNDERPERFORM |
+| `TECH_PIVOT` | Techniczna | BUY (BULLISH) / SELL (BEARISH) / WAIT (CHOP) |
 | `FUND_OVERVIEW` | Fundamentalna | BUY / HOLD / WAIT (scoring 0–100) |
 | `FUND_SCORE_PIOTROSKI` | Fundamentalna | STRONG (7-9) / WEAK (0-4) |
 | `FUND_EARNINGS_DRIFT` | Fundamentalna | POSITIVE DRIFT / NEGATIVE DRIFT |
@@ -47,6 +48,27 @@ Obsługiwane komendy:
 - `/run MODULE_NAME` — natychmiastowe uruchomienie wybranego modułu (np. `/run TECH_DIVERGENCE`)
 
 Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `409` przy `getUpdates`.
+
+## Web Dashboard
+
+System zawiera interaktywny dashboard Streamlit dostępny przez `dashboard.py`.
+
+### Funkcjonalności:
+- **Wybór spółki**: Lista wszystkich tickerów z `config.yaml`
+- **Okresy historyczne**: 5d, 1mo, 3mo, 6mo, 1y
+- **Interwały**: 1d, 1h, 30m, 15m
+- **Wykres cenowy**: Linia ceny z interaktywnym zoomem/panem
+- **Poziomy Pivot**: Automatyczne obliczenie i wyświetlenie P, R1, R2, R3, S1, S2, S3
+- **Dokładne wartości**: Metryki z precyzyjnymi poziomami pivot
+- **VWAP**: Obliczenie Volume Weighted Average Price
+- **Struktura rynku**: Detekcja HH/HL/LH/LL
+- **Setupy**: LONG_PIVOT / SHORT_PIVOT z rekomendacjami
+- **Odświeżanie**: Przycisk manualny + auto odświeżanie co 5 min
+
+### Uruchomienie:
+```bash
+streamlit run dashboard.py
+```
 
 ## Opis modułów i logika sygnałów
 
@@ -230,6 +252,38 @@ Oblicza relatywną siłę spółki vs benchmark (Jegadeesh-Titman momentum facto
 | ⚪ NEUTRAL | między -15pp a +15pp |
 
 Konfiguracja: `relative_strength_criteria.lookback_months`, `outperform_pct`, `underperform_pct`.
+
+---
+
+### TECH_PIVOT
+
+Zaawansowana analiza techniczna punktów odniesienia (Pivot Points), VWAP, struktury rynku i setupów płynności.
+
+**Wskaźniki:** HLC (High, Low, Close) z poprzedniego dnia, Volume, OHLC bieżące.
+
+#### Pivot Points
+Obliczone z poprzedniej sesji:
+- **Pivot (P)**: `(High + Low + Close) / 3`
+- **Resistance 1/2/3 (R1/R2/R3)**: Poziomy oporu
+- **Support 1/2/3 (S1/S2/S3)**: Poziomy wsparcia
+
+#### VWAP (Volume Weighted Average Price)
+Średnia cena ważona wolumenem — dynamiczne wsparcie/opór.
+
+#### Market Structure
+- **HH/HL**: Higher High/Low (struktura wzrostowa)
+- **LH/LL**: Lower High/Low (struktura spadkowa)
+
+#### Liquidity Sweeps
+Przełamania poziomów z wysokim wolumenem potwierdzające kierunek.
+
+| Sygnał | Bias | Warunki |
+|--------|------|--------|
+| 🟢 BUY (BULLISH) | LONG_PIVOT | Cena > Pivot, pullback do poziomu, reakcja wzrostowa, HH/HL struktura, VWAP wsparcie |
+| 🔴 SELL (BEARISH) | SHORT_PIVOT | Cena < Pivot, odbicie od poziomu, reakcja spadkowa, LH/LL struktura, VWAP opór |
+| ⚪ WAIT (CHOP) | Konsolidacja | Cena w strefie szumu wokół Pivot (± chop_zone_pct) |
+
+Konfiguracja: `pivot_criteria.chop_zone_pct` (domyślnie `0.15`).
 
 ---
 
@@ -874,6 +928,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `TECH_GAPS`
 - `TECH_INDICATORS`
 - `TECH_MA_CROSSOVER`
+- `TECH_PIVOT`
 - `TECH_REL_STRENGTH`
 - `TECH_SUPPORT_BOUNCE`
 - `TECH_VOLUME`
