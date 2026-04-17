@@ -1096,6 +1096,48 @@ Dlatego system:
 
 Jeżeli wciągu 3 dni spółka urosła o 20%, jej status w cache'u dynamicznie przekształci się z `Undervalued` na `Overvalued`, bez wysyłania zbędnego promtu do serwerów Google Gemini / OpenAI.
 
+### 5. Analiza Techniczna Pivot & Struktura Rynku (TECH_PIVOT)
+Moduł ten pozwala na interpretację punktów odniesienia (pivot points), poziomów VWAP, wykrywanie struktury rynku oraz setupów opartych o płynność (liquidity sweeps).
+
+**Podstawy Pivot Points**
+Pivot points obliczane są na podstawie High, Low i Close z poprzedniego dnia sesyjnego:
+- **Pivot (P)**: `(High + Low + Close) / 3`
+- **Resistance 1 (R1)**: `(2 × P) - Low`
+- **Support 1 (S1)**: `(2 × P) - High`
+- **Resistance 2 (R2)**: `P + (High - Low)`
+- **Support 2 (S2)**: `P - (High - Low)`
+
+**VWAP (Volume Weighted Average Price)**
+VWAP to średnia cena ważona wolumenem:
+- Cena powyżej VWAP = bycze momentum (bullish)
+- Cena poniżej VWAP = niedźwiedzie momentum (bearish)
+- VWAP działa jako dynamiczne wsparcie/opór.
+
+**Wykrywanie struktury rynku**
+- **Higher High (HH)**: Obecny szczyt > poprzedni szczyt
+- **Higher Low (HL)**: Obecny dołek > poprzedni dołek
+- **Lower High (LH)**: Obecny szczyt < poprzedni szczyt
+- **Lower Low (LL)**: Obecny dołek < poprzedni dołek
+
+**Liquidity Sweep Setup**
+Zebranie płynności (sweep) występuje, gdy cena przebija kluczowy poziom na wysokim wolumenie i szybko zawraca:
+- **Bullish Sweep**: Przebicie oporu w dół z wysokim wolumenem i powrót.
+- **Bearish Sweep**: Przebicie wsparcia w górę z wysokim wolumenem i odrzucenie.
+
+**Logika Generowania Setupów (v2)**
+1. **SHORT_ATH** (Short z ekstremum): Cena blisko ATH lub wybicie nowego high i odrzucenie. Target: Pivot, S1.
+2. **SHORT_R1** (Short z oporu): Test poziomu R1 z odrzuceniem (knotem). Target: Pivot, S1.
+3. **LONG_S1** (Long ze wsparcia S1): Cena testuje S1 i odbija. Target: Pivot, R1.
+4. **LONG_PIVOT** (Long z pivota - pullback): Pullback do pivota z pomyślnym retestem. Target: Szczyt dnia, ATH.
+5. **FAKE_BIAS_SHORT** (Odrzucenie byczej struktury): Struktura LH (niższy szczyt) i nieudany retest pivota. Target: S1.
+
+*Priorytet:* Konkretne setupy mają zawsze wyższy priorytet niż ogólny kierunek (bias). Sygnały BULLISH/BEARISH są wysyłane tylko wtedy, gdy nie wykryto dedykowanego setupu.
+
+**Zarządzanie Ryzykiem i Odczyt**
+- Wykorzystuj poziomy R1/R2 i S1/S2 jako cele zysku (take profit) i poziomy obronne (stop loss).
+- Sugerowane R/R (Zysk do Ryzyka): Minimum 2:1.
+- Wyjście z pozycji (invalidacja): Zamknięcie ceny poniżej pivota (dla pozycji long) lub powyżej pivota (dla pozycji short).
+
 ## Wymagane sekcje config.yaml
 
 Minimalnie plik `config.yaml` powinien zawierac:
