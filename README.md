@@ -881,7 +881,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--silent` - tryb cichy: brak logow konsolowych i brak powiadomien Telegram; sygnaly i dane dalej trafiaja do SQLite
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
 - `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
-- `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US`)
+- `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US` lub `*.US` dla calego rynku)
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
@@ -948,6 +948,9 @@ python stock_radar.py --schedule --silent
 
 # jednorazowy run dla konkretnej listy spolek
 python stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT_PRICE_CHANGE
+
+# analiza calego rynku amerykanskiego i dodatkowo wybranej spolki z PL
+python stock_radar.py --tickers *.US,CDR.PL
 
 # backfill luk cenowych dla 6 miesiecy
 python stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
