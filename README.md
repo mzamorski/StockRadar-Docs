@@ -1107,6 +1107,24 @@ Pivot points obliczane są na podstawie High, Low i Close z poprzedniego dnia se
 - **Resistance 2 (R2)**: `P + (High - Low)`
 - **Support 2 (S2)**: `P - (High - Low)`
 
+**Fibonacci (retracement)**
+- Dla danych intraday zniesienia Fibo liczone są z aktywnego swinga bieżącej sesji, a nie z poprzedniej świecy referencyjnej.
+- Dla swinga wzrostowego poziomy cofnięcia liczone są od `High` w dół, np. `Fib 38.2 = High - 0.382 × (High - Low)`.
+- Dla swinga spadkowego poziomy cofnięcia liczone są od `Low` w górę.
+- Dashboard i `TECH_PIVOT` używają tej samej logiki, więc wartości na wykresie i w analizie są spójne.
+- Dla tickerów intraday można dodatkowo zawęzić źródło swinga do regular session przez parametry `fib_session_timezone`, `fib_session_start`, `fib_session_end` w `config.yaml`.
+
+**Fibonacci (extension)**
+- Dostępne są też poziomy `Ext 100%`, `Ext 127.2%`, `Ext 161.8%` liczone z tego samego aktywnego swinga.
+- Dla swinga wzrostowego są to projekcje ponad `High`; dla spadkowego poniżej `Low`.
+- W `TECH_PIVOT` poziomy extension są logowane i przekazywane w `signal_params`, a dashboard rysuje je na wykresie.
+
+**Poziomy na kolejny dzień (D+1)**
+- `TECH_PIVOT` może działać w trybie utrwalonych poziomów D+1 (`pivot_criteria.use_next_day_frozen_levels: true`).
+- Po zakończonej sesji wyznaczany jest pakiet poziomów na następny dzień i zapisywany w `app_state` (`stock_radar.db`).
+- W kolejnym dniu poziomy są odczytywane z cache i nie są rekalkulowane intraday.
+- Dashboard korzysta z tej samej ścieżki, więc wartości w UI i sygnałach pozostają spójne.
+
 **VWAP (Volume Weighted Average Price)**
 VWAP to średnia cena ważona wolumenem:
 - Cena powyżej VWAP = bycze momentum (bullish)
