@@ -311,6 +311,8 @@ Ocenia kondycję fundamentalną spółki systemem punktowym (0–100+).
 | Kwartalny zysk netto q/q | 5 | ≥ 20%: 5 \| ≥ 0%: 2 \| spadek: 0 |
 | FCF Yield (Wolne Przepływy) | −5 do +15 | ≥ 10%: 15 \| ≥ 5%: 10 \| > 0: 5 \| < 0: −5 |
 
+**Uwaga dot. stopy dywidendy:** do punktacji system preferuje yield liczony dynamicznie jako `dividendRate / currentPrice` (jeśli oba pola są dostępne). Wartość dostawcy (`dividendYield`) jest używana jako fallback.
+
 **Fair Value upside** bazuje na composite fair value — **medianie** z zastosowanych modeli wyceny:
 
 #### Fair Value — modele wyceny
