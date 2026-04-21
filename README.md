@@ -297,7 +297,7 @@ Ocenia kondycję fundamentalną spółki systemem punktowym (0–100+).
 
 | Kryterium | Maks. pkt | Logika |
 |-----------|-----------|--------|
-| Stopa dywidendy | 20 | ≥ 6%: 20 pkt \| ≥ 3%: 10 pkt |
+| Stopa dywidendy | 30 | ≥ 8%: 30 pkt \| ≥ 6%: 20 pkt \| ≥ 3%: 10 pkt |
 | Regularne dywidendy (3 lata) | 5 | Bonus: dywidenda > 0 każdego roku |
 | Ryzyko cięcia dywidendy | −5 | Kara: forward yield < 70% trailing annual yield |
 | Stabilność dywidendy | 5 | Bonus: trailing yield ≥ 90% średniej 5-letniej i payout ≤ 85% |
