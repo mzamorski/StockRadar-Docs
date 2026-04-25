@@ -17,6 +17,7 @@ StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznyc
 | `TECH_ADX` | Techniczna | STRONG↑ / STRONG↓ / BUILDING / WEAK |
 | `TECH_REL_STRENGTH` | Techniczna | OUTPERFORM / UNDERPERFORM |
 | `TECH_PIVOT` | Techniczna | BUY (BULLISH) / SELL (BEARISH) / WAIT (CHOP) |
+| `TECH_MARKET_BREADTH` | Techniczna (rynkowa) | 🔥 SILNA HOSSA / 📈 HOSSA / ⚪ NEUTRALNY / 📉 BESSA / ⚠️ SILNA BESSA |
 | `FUND_OVERVIEW` | Fundamentalna | BUY / HOLD / WAIT (scoring 0–100) |
 | `FUND_SCORE_PIOTROSKI` | Fundamentalna | STRONG (7-9) / WEAK (0-4) |
 | `FUND_EARNINGS_DRIFT` | Fundamentalna | POSITIVE DRIFT / NEGATIVE DRIFT |
@@ -284,6 +285,49 @@ Przełamania poziomów z wysokim wolumenem potwierdzające kierunek.
 | ⚪ WAIT (CHOP) | Konsolidacja | Cena w strefie szumu wokół Pivot (± chop_zone_pct) |
 
 Konfiguracja: `pivot_criteria.chop_zone_pct` (domyślnie `0.15`).
+
+---
+
+### TECH_MARKET_BREADTH
+
+Analizuje szerokość rynku GPW — mierzy, ile spółek faktycznie uczestniczy w ruchu indeksu, a nie tylko jego giganty. Działa w dwóch trybach jednocześnie i raportuje wynik jako **jeden zbiorczy wiersz** w konsoli po zakończeniu pełnego cyklu skanowania.
+
+**Dane:** yfinance (batch download), 1 rok historii dziennej (`period=1y`).
+
+#### Dwa źródła danych
+
+| Źródło | Opis |
+|--------|------|
+| **Radar** | Spółki ze scanera (z głównej pętli `analyze()`) — wyniki gromadzone inline |
+| **WIG broad** | Stały koszyk ~81 spółek: WIG20 + mWIG40 (odchudzone) + sWIG80 proxy — pobierany jednorazowo w `finalize_analysis()` |
+
+#### Metryki
+
+| Metryka | Opis |
+|---------|------|
+| **A/D Ratio** | Stosunek liczby spółek rosnących do spadających w danym dniu |
+| **% Above SMA50** | Odsetek spółek, których kurs jest powyżej 50-sesyjnej średniej kroczącej |
+| **% Above SMA200** | Odsetek spółek powyżej 200-sesyjnej średniej (długoterminowy trend) |
+
+> Spółki z `NaN` na SMA (zbyt mała historia) są **wykluczane** z licznika, nie zawyżają/zaniżają wyniku. Spółki z flat close (bez zmiany ceny) nie wliczają się ani do wzrostów, ani do spadków.
+
+#### Logika statusu
+
+| Warunek | Status |
+|---------|--------|
+| `>SMA50 > 70%` **i** `A/D > 1.5` | 🔥 SILNA HOSSA |
+| `>SMA50 > 60%` | 📈 HOSSA |
+| `>SMA50 30–60%` | ⚪ NEUTRALNY |
+| `>SMA50 < 40%` | 📉 BESSA |
+| `>SMA50 < 30%` **i** `A/D < 0.7` | ⚠️ SILNA BESSA |
+
+#### Interpretacja sygnału ukrytej słabości
+
+Jeśli WIG rośnie, ale `% Above SMA50` spada — tylko największe spółki ciągną indeks w górę przy słabości reszty rynku. To klasyczny sygnał ostrzegawczy poprzedzający korektę.
+
+#### Alert Telegram
+
+Wysyłany raz na cykl (deduplikacja przez `state_value = "{pct_above_50}|{ad_ratio}"`).
 
 ---
 
