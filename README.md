@@ -473,6 +473,12 @@ Dodatkowo działa kara konfliktu (value-trap guard): gdy FUND jest dodatni, ale 
 
 **Dane:** tabela `trade_signals` w SQLite (ostatnie N dni)
 
+#### Kluczowy parametr: Lookback (dni)
+
+Parametr `lookback_days` (domyślnie 3) określa **okno pamięci systemu**. Ponieważ moduły działają z różną częstotliwością (np. fundamenty raz na dobę, technika co 15 minut), system musi "pamiętać" poprzednie wskazania. 
+
+Dzięki temu `META_CONFLUENCE` może połączyć np. sygnał `BUY` z modułu fundamentalnego sprzed 2 dni z dzisiejszym wybiciem technicznym, generując finalny sygnał zbieżności. Sygnały starsze niż zdefiniowana liczba dni są ignorowane jako nieaktualne.
+
 | Sygnał | Warunki |
 |--------|--------|
 | 🟢🟢 STRONG BULLISH | Composite bullish, mocny wynik i brak istotnej kontrstrony |
