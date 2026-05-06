@@ -94,17 +94,57 @@ Analizuje klasyczne wskaźniki techniczne na danych dziennych.
 
 ### TECH_VOLUME
 
-Wykrywa anomalie wolumenowe względem historycznej średniej.
+Wykrywa anomalie wolumenowe względem historycznej średniej, integując je z analizą Order Book dla potwierdzenia sygnałów.
 
-**Wskaźniki:** wolumen bieżący, SMA wolumenu (20 sesji)
+**Wskaźniki:** 
+- Wolumen bieżący vs. SMA wolumenu (20 sesji)
+- Order Book Direction Score (bid-ask imbalance)
+- Kierunek świecy (bullish/bearish)
 
-| Sygnał | Warunki |
-|--------|--------|
-| 🟢 BUY (BULLISH) | Wolumen ≥ 300% MA20 AND świeca zielona (Close > Open) |
-| 🔴 SELL (BEARISH) | Wolumen ≥ 300% MA20 AND świeca czerwona (Close < Open) |
-| ⚪ WAIT | Brak skoku wolumenu |
+**Logika Sygnałów (3-warstwowa):**
 
-Próg (domyślnie 300%) konfigurowalny przez `volume_criteria.threshold_pct`.
+| Warstwę | Sygnał | Warunki | Confidence |
+|---------|--------|---------|-----------|
+| **Tier 1** | 🟢 STRONG_BUY | Spike + Order Book bullish (score > 0.1) | 0.95 |
+| **Tier 1** | 🟢 BUY | Spike + Order Book neutral/bullish (score > -0.1) | 0.85 |
+| **Tier 1** | 🔴 STRONG_SELL | Spike + Order Book bearish (score < -0.1) | 0.95 |
+| **Tier 1** | 🔴 SELL | Spike + Order Book neutral/bearish (score < 0.1) | 0.85 |
+| **Tier 2** | 🟢 OB_BUY | Silny sygnał Order Book bez spike (score > 0.3) | 0.30+ |
+| **Tier 2** | 🔴 OB_SELL | Silny sygnał Order Book bez spike (score < -0.3) | 0.30+ |
+| **Tier 3** | ⚪ WAIT | Brak konfiguracji lub słaby sygnał | — |
+
+**Progi konfiguracyjne** (domyślnie):
+- Spike wolumenu: ≥ 300% MA20
+- Order Book confidence threshold: > 0.3 (dla samodzielnych OB sygnałów)
+- MA window: 20 dni
+
+**Konfiguracja** (`config.yaml`):
+```yaml
+volume_criteria:
+  threshold_pct: 300.0        # Próg spike'u (%)
+  ma_window_days: 20          # Okno średniej ruchomej
+```
+
+**Output metryki** w `signal_params`:
+```python
+{
+    "combined_signal": "BULLISH" | "BEARISH",      # Ostateczny sygnał
+    "combined_confidence": 0.85,                    # Confidence 0.0-1.0
+    "volume_spike": True,                           # Czy spike detectowany
+    "spike_pct": 320.5,                             # Wolumen % średniej
+    "ob_direction_score": 0.65,                     # Order Book direction (-1 do 1)
+    "ob_signal": "BULLISH",                         # OB label
+    "is_green_candle": True,                        # Kierunek świecy
+    "current_volume": 1200000,
+    "avg_volume": 375000
+}
+```
+
+**Opis zmian (v2.0+):**
+- ✅ **Zawsze** pobierana analiza Order Book (nie tylko przy spike'u)
+- ✅ Kombinacja dwóch niezależnych sygnałów dla wyższej jakości
+- ✅ Możliwość handlu sygnałami Order Book bez volume spike
+- ✅ Wbudowana pewność (confidence scoring)
 
 ---
 
