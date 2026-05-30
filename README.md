@@ -52,7 +52,7 @@ Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `40
 
 ## Web Dashboard
 
-System zawiera interaktywny dashboard Streamlit dostępny przez `dashboard.py`.
+System zawiera interaktywny dashboard Streamlit dostępny przez `app.py`.
 
 ### Funkcjonalności:
 - **Wybór spółki**: Lista wszystkich tickerów z `config.yaml`
@@ -68,7 +68,7 @@ System zawiera interaktywny dashboard Streamlit dostępny przez `dashboard.py`.
 
 ### Uruchomienie:
 ```bash
-streamlit run dashboard.py
+streamlit run app.py
 ```
 
 ## Opis modułów i logika sygnałów
