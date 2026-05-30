@@ -968,6 +968,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 
 ## Wszystkie argumenty CLI
 
+- `--menu` - wyświetla interaktywne menu konsolowe do uruchamiania zdefiniowanych skryptów (z `config.yaml`). Obsługuje m.in. dynamiczne parametry wejściowe (TICKER, MODEL itp.) z możliwością wyboru opcji ze strzałkami.
 - `--schedule` - uruchamia petle harmonogramu
 - `--ignore-schedule` - ignoruje `active_hours` i uruchamia aktywne moduly niezaleznie od okien czasu
 - `--silent` - tryb cichy: brak logow konsolowych i brak powiadomien Telegram; sygnaly i dane dalej trafiaja do SQLite
