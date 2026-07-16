@@ -31,6 +31,7 @@ StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznyc
 | `ALERT_CALENDAR` | Alert | informacyjny |
 | `REPORT_AI_RECOMMENDATIONS` | Raport (AI) | KUP / TRZYMAJ / OMIJAJ |
 | `REPORT_AI_DAILY_PICK` | Raport (AI) | pick dnia |
+| `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
 | `REPORT_MORNING_BRIEF` | Raport | informacyjny |
 
 ### Telegram
@@ -44,7 +45,7 @@ Obsługiwane komendy:
 - `/wycena TICKER`
 - `/arkusz TICKER`
 - `/fundamenty TICKER`
-- `/signal TICKER SIGNAL [MODULE] [NOTATKA]` — ręczny zapis sygnału do `trade_signals` (np. po analizie AI w WWW); model dodajesz tokenem `ai:MODEL`
+- `/signal TICKER SIGNAL [MODULE] [ATRYBUCJA] [NOTATKA]` — ręczny zapis sygnału do `trade_signals`; AI opisujesz tokenem `ai:MODEL`, a analityka tokenami `type:analyst|social_account source:NAZWA platform:PLATFORMA url:URL`
 - `/ai_batch [TREŚĆ]` — hurtowy zapis rekomendacji wygenerowanych przez AI w WWW w formacie `TICKER: REKOMENDACJA | powód`
 - `/run MODULE_NAME` — natychmiastowe uruchomienie wybranego modułu (np. `/run TECH_DIVERGENCE`)
 
@@ -767,6 +768,22 @@ Generuje jeden "pick dnia" — najlepszą spółkę z listy.
 
 ---
 
+### REPORT_ANALYST_PICK
+
+Rejestruje ręczne wskazania analityków i kont społecznościowych przez wspólny mechanizm `trade_signals`.
+
+- `source_type`: `analyst` albo `social_account`
+- `source_name`: nazwa analityka lub konta (wymagana)
+- `source_platform`: np. `X`, `YouTube`, `TV` albo `DM`
+- `source_url`: opcjonalny link do materiału źródłowego
+- `ingestion_channel`: techniczny kanał zapisu, np. `cli` albo `telegram`
+
+Moduł nie ma osobnego analizatora ani harmonogramu. Różni autorzy korzystają z tej samej funkcji rejestrującej, ale pozostają oddzielnymi źródłami w deduplikacji i statystykach backtestu.
+
+W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `interval_minutes` ani `active_hours`, jest pomijany przez scheduler oraz przez jednorazowy przebieg analizy.
+
+---
+
 ### REPORT_MORNING_BRIEF
 
 Generuje poranny przegląd rynkowy (raz dziennie).
@@ -984,6 +1001,10 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--register-note <TXT>` - notatka opisująca kontekst decyzji
 - `--register-price <P>` - cena wejścia; gdy brak, system pobiera ostatni close z Yahoo
 - `--register-ai-model <N>` - nazwa modelu AI do statystyk (np. `gemini-2.5-flash`, `gpt-5.4-nano`)
+- `--register-source-type <T>` - typ źródła: `ai`, `analyst` albo `social_account`
+- `--register-source-name <N>` - nazwa modelu, analityka albo konta społecznościowego
+- `--register-source-platform <P>` - platforma publikacji, np. `X`, `YouTube` albo `DM`
+- `--register-source-url <URL>` - opcjonalny adres HTTP/HTTPS materiału źródłowego
 - `--register-ai-batch <PATH>` - wczytuje zbiorcze wyniki AI z pliku tekstowego (format: `TICKER: REKOMENDACJA | powód`)
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
@@ -1005,6 +1026,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 
 - `REPORT_AI_DAILY_PICK`
 - `REPORT_AI_RECOMMENDATIONS`
+- `REPORT_ANALYST_PICK`
 - `ALERT_PRICE_CHANGE`
 - `ALERT_PRICE_LEVEL`
 - `FEED_CALENDAR`
@@ -1054,6 +1076,9 @@ python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-
 # ręczny zapis sygnału BUY z nazwą modelu AI
 python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-note "AI WWW daily pick"
 
+# ręczny zapis wskazania analityka z platformy X
+python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
+
 # backtest sygnalow BUY/SELL z eksportem CSV
 python stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
 
@@ -1070,17 +1095,19 @@ python stock_radar.py --signals-chart-days 14
 python stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
 ```
 
-Przy ręcznym zapisie nazwa modelu trafia do `trade_signals.signal_params.ai_model`.
-Możesz to potem agregować, np.:
+Przy ręcznym zapisie atrybucja trafia do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`.
+Możesz agregować wszystkie rodzaje źródeł wspólnym zapytaniem:
 
 ```sql
 SELECT
-  json_extract(signal_params, '$.ai_model') AS ai_model,
+  json_extract(signal_params, '$.source_type') AS source_type,
+  json_extract(signal_params, '$.source_name') AS source_name,
+  json_extract(signal_params, '$.source_platform') AS source_platform,
   COUNT(*) AS signals
 FROM trade_signals
-WHERE module = 'REPORT_AI_DAILY_PICK'
+WHERE module IN ('REPORT_AI_DAILY_PICK', 'REPORT_ANALYST_PICK')
   AND signal IN ('BUY', 'SELL', 'HOLD')
-GROUP BY ai_model
+GROUP BY source_type, source_name, source_platform
 ORDER BY signals DESC;
 ```
 
@@ -1089,7 +1116,7 @@ ORDER BY signals DESC;
 - Backtest domyslnie ocenia tylko moduly z `module_role: signal`; alerty i raporty sa pomijane.
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
 - Domyslne horyzonty sa rozdzielone per typ modułu: fundamentalne maja zwykle `30,60,90,180`, a techniczne `1,7,14,30`.
-- Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal)` i zostawia pierwszy sygnal z okna.
+- Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
 - Gdy dla docelowego horyzontu brakuje ceny wyjscia (np. sygnal jest zbyt swiezy), backtest uzupelnia exit ostatnia dostepna cena po dacie wejscia zamiast pomijac rekord.
 - Sukces sygnalu liczony jest po `directional_return_pct`, nie po surowym zwrocie; domyslnie potrzeba wyniku powyzej `1.0%`.
 - Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci.
@@ -1101,6 +1128,8 @@ Pliki CSV po eksporcie backtestu:
 - `backtest_results_by_module.csv` - statystyki modułów per horyzont
 - `backtest_results_module_ranking.csv` - ranking ogolny skutecznosci modułów
 - `backtest_results_module_ranking_by_horizon.csv` - ranking modułów osobno dla kazdego horyzontu
+- `backtest_results_source_ranking.csv` - ranking modeli, analityków i kont społecznościowych
+- `backtest_results_source_ranking_by_horizon.csv` - ranking źródeł osobno dla każdego horyzontu
 - `backtest_results_confidence_buckets.csv` - statystyki confidence bucketow lacznie dla wszystkich horyzontow
 - `backtest_results_confidence_buckets_by_horizon.csv` - statystyki confidence bucketow osobno dla kazdego horyzontu
 - `backtest_results_confidence_buckets_ranking.csv` - ranking confidence bucketow dla calego zbioru
