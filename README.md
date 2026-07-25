@@ -34,6 +34,23 @@ StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznyc
 | `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
 | `REPORT_MORNING_BRIEF` | Raport | informacyjny |
 
+### Klasyfikacja mechanizmu generowania sygnałów
+
+Na potrzeby analizy i porównywania skuteczności moduły oraz sygnały należy klasyfikować według źródła decyzji:
+
+| Klasa | Mechanizm | Przykłady |
+|-------|-----------|-----------|
+| `HEURISTIC` | Deterministyczne reguły, progi, wagi i scoringi zdefiniowane w StockRadarze | moduły `TECH_*`, `FUND_OVERVIEW`, `FUND_SCORE_PIOTROSKI`, `FUND_EARNINGS_DRIFT`, `META_CONFLUENCE` |
+| `AI` | Werdykt lub wycena wygenerowana przez model AI | `META_AI_VERDICT`, `FUND_AI_FAIR_VALUE`, `REPORT_AI_RECOMMENDATIONS`, `REPORT_AI_DAILY_PICK` |
+| `EXTERNAL` | Decyzja człowieka albo zewnętrznego źródła, w tym sygnał zarejestrowany ręcznie | `REPORT_ANALYST_PICK`, rekomendacje analityczne, konta społecznościowe, sygnały manualne |
+| `INFORMATIONAL` | Rejestracja zdarzenia lub przekroczenia warunku bez właściwej prognozy inwestycyjnej | `ALERT_ESPI`, `ALERT_CALENDAR`, `ALERT_KNF_SHORT` oraz proste alerty cenowe |
+
+Określenie **moduły heurystyczne** jest poprawne dla modułów regułowych. Same wzory wskaźników i modeli, np. RSI, ADX, Piotroski F-Score, DCF lub EPV, są obliczeniami ilościowymi; heurystyczna jest ich interpretacja poprzez ustalone progi, punkty i wagi prowadzące do sygnału `BUY`, `SELL` lub `HOLD`.
+
+Wynik `confidence_score` w zakresie 0–100 jest indeksem heurystycznym, a nie bezpośrednim prawdopodobieństwem sukcesu. Może być interpretowany probabilistycznie dopiero po kalibracji na wynikach backtestu.
+
+Przy porównywaniu jakości predykcyjnej zalecany jest podział na `HEURISTIC`, `AI` i `EXTERNAL`. Sygnały `INFORMATIONAL` powinny być analizowane oddzielnie, ponieważ zazwyczaj nie zawierają kierunkowej prognozy inwestycyjnej.
+
 ### Telegram
 
 System wysyła alerty na Telegram i może uruchomić interaktywnego bota.
@@ -1019,6 +1036,9 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-ai-analysis` - po zakonczeniu backtestu wysyla wyniki do AI (Gemini/OpenAI) w celu analizy; w trybie `prompt` dostarcza gotowy prompt na Telegram
 - `--signals-chart-days <D>` - wygeneruj i wyświetl w konsoli dwustronny wykres słupkowy sygnałów z ostatnich D dni
 - `--signals-chart-modules <M1,M2,...>` - wymuś na wykresie konkretne moduły (zamiast domyślnych z rolą `signal`)
+- `--list-signals-days <D>` - wyświetla maksymalnie 10 tickerów z największą liczbą sygnałów z ostatnich D dni; wyniki są agregowane po tickerze i sortowane malejąco według łącznej liczby sygnałów
+- `--list-signals-module <M>` - wybiera moduł uwzględniany w tabeli rekomendacji
+- `--anonymize-tickers <MODE>` - ustawia prezentację tickerów w tabeli: `nie` pozostawia oryginały, `pełna` generuje identyfikatory `TICKER-001`, `TICKER-002` itd., a `maskowana` pozostawia pierwszą literę i kraj oraz zawsze wstawia dwie gwiazdki, np. `GOOGL.US` → `G**.US` i `V.US` → `V**.US`. Stała liczba gwiazdek nie ujawnia długości tickera. Opcja jest dostępna w menu „Wylistuj sygnały wg okresu”; wartości `tak/nie` pozostają zgodne wstecznie.
 - `--debug` - uruchamia aplikację w trybie debugowania (więcej logów i szczegółów)
 - `--help` - wyświetla w konsoli listę wszystkich dostępnych komend
 
