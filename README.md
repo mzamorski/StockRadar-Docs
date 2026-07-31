@@ -813,6 +813,8 @@ Rejestruje ręczne wskazania analityków i kont społecznościowych przez wspól
 
 Moduł nie ma osobnego analizatora ani harmonogramu. Różni autorzy korzystają z tej samej funkcji rejestrującej, ale pozostają oddzielnymi źródłami w deduplikacji i statystykach backtestu.
 
+Menu udostępnia zarówno zapis pojedynczego wskazania, jak i opcję **Importuj rekomendacje analityka lub DM z JSON**. Importowana paczka jest zawsze zapisywana w module `REPORT_ANALYST_PICK`. Atrybucja może być wspólna dla płaskiej listy `signals` albo określona osobno dla każdej rekomendacji przez pole `institution`.
+
 W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `interval_minutes` ani `active_hours`, jest pomijany przez scheduler oraz przez jednorazowy przebieg analizy.
 
 ---
@@ -1054,6 +1056,22 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   ```
 
   `recommendation_type` dotyczy całej paczki i jest opcjonalne; brak pola oznacza `fundamental`. Jawna flaga `--register-recommendation-type` ma pierwszeństwo przed wartością z JSON. Starszy format JSON z polem `"tickers"` pozostaje obsługiwany i traktuje wszystkie wpisy jako `BUY`. Format tekstowy: `TICKER: REKOMENDACJA | powód`.
+- `--register-analyst-batch <PATH>` - importuje paczkę JSON jako `REPORT_ANALYST_PICK`. Atrybucja znajduje się w samym pliku. Obsługiwany jest płaski format:
+
+  ```json
+  {
+    "source_type": "analyst",
+    "source_name": "DM BOŚ",
+    "source_platform": "DM",
+    "recommendation_type": "fundamental",
+    "signals": [
+      {"ticker": "XTB.PL", "signal": "BUY"},
+      {"ticker": "CDR.PL", "signal": "HOLD"}
+    ]
+  }
+  ```
+
+  Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` staje się `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Rekomendacje `ACCUMULATE` są mapowane na `BUY`, a `REDUCE` na `SELL`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału oraz kurs wejścia odpowiadają dacie raportu lub pierwszej kolejnej sesji.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -1129,6 +1147,9 @@ python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --regis
 
 # ręczny zapis wskazania analityka z platformy X
 python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
+
+# masowy import rekomendacji jednego domu maklerskiego z pliku JSON
+python src/stock_radar.py --register-analyst-batch tmp/dm_bos.json
 
 # backtest sygnalow BUY/SELL z eksportem CSV
 python src/stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
