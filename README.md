@@ -809,6 +809,7 @@ Rejestruje ręczne wskazania analityków i kont społecznościowych przez wspól
 - `source_platform`: np. `X`, `YouTube`, `TV` albo `DM`
 - `source_url`: opcjonalny link do materiału źródłowego
 - `ingestion_channel`: techniczny kanał zapisu, np. `cli` albo `telegram`
+- `recommendation_type`: `fundamental` albo `technical`; brak wartości oznacza `fundamental`
 
 Moduł nie ma osobnego analizatora ani harmonogramu. Różni autorzy korzystają z tej samej funkcji rejestrującej, ale pozostają oddzielnymi źródłami w deduplikacji i statystykach backtestu.
 
@@ -1037,11 +1038,13 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--register-source-name <N>` - nazwa modelu, analityka albo konta społecznościowego
 - `--register-source-platform <P>` - platforma publikacji, np. `X`, `YouTube` albo `DM`
 - `--register-source-url <URL>` - opcjonalny adres HTTP/HTTPS materiału źródłowego
+- `--register-recommendation-type <T>` - typ rekomendacji: `fundamental` albo `technical`; domyślnie `fundamental`
 - `--register-ai-batch <PATH>` - wczytuje zbiorcze wyniki AI z pliku JSON lub tekstowego. Format JSON pozwala przypisać osobno sygnał `BUY`, `SELL` albo `HOLD` do każdego tickera:
 
   ```json
   {
     "model": "gpt-5",
+    "recommendation_type": "technical",
     "signals": [
       {"ticker": "XTB.PL", "signal": "BUY"},
       {"ticker": "CDR.PL", "signal": "SELL"},
@@ -1050,7 +1053,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   }
   ```
 
-  Starszy format JSON z polem `"tickers"` pozostaje obsługiwany i traktuje wszystkie wpisy jako `BUY`. Format tekstowy: `TICKER: REKOMENDACJA | powód`.
+  `recommendation_type` dotyczy całej paczki i jest opcjonalne; brak pola oznacza `fundamental`. Jawna flaga `--register-recommendation-type` ma pierwszeństwo przed wartością z JSON. Starszy format JSON z polem `"tickers"` pozostaje obsługiwany i traktuje wszystkie wpisy jako `BUY`. Format tekstowy: `TICKER: REKOMENDACJA | powód`.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -1122,7 +1125,7 @@ python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,
 python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-note "AI WWW daily pick"
 
 # ręczny zapis sygnału BUY z nazwą modelu AI
-python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-note "AI WWW daily pick"
+python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-recommendation-type technical --register-note "AI WWW daily pick"
 
 # ręczny zapis wskazania analityka z platformy X
 python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
@@ -1143,7 +1146,7 @@ python src/stock_radar.py --signals-chart-days 14
 python src/stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
 ```
 
-Przy ręcznym zapisie atrybucja trafia do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`.
+Przy ręcznym zapisie atrybucja i znormalizowany `recommendation_type` trafiają do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`. Dla starszych rekordów bez tego pola należy przy odczycie przyjmować `fundamental`.
 Możesz agregować wszystkie rodzaje źródeł wspólnym zapytaniem:
 
 ```sql
@@ -1151,11 +1154,12 @@ SELECT
   json_extract(signal_params, '$.source_type') AS source_type,
   json_extract(signal_params, '$.source_name') AS source_name,
   json_extract(signal_params, '$.source_platform') AS source_platform,
+  COALESCE(json_extract(signal_params, '$.recommendation_type'), 'fundamental') AS recommendation_type,
   COUNT(*) AS signals
 FROM trade_signals
 WHERE module IN ('REPORT_AI_DAILY_PICK', 'REPORT_ANALYST_PICK')
   AND signal IN ('BUY', 'SELL', 'HOLD')
-GROUP BY source_type, source_name, source_platform
+GROUP BY source_type, source_name, source_platform, recommendation_type
 ORDER BY signals DESC;
 ```
 
