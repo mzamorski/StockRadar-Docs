@@ -1022,7 +1022,20 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--register-source-name <N>` - nazwa modelu, analityka albo konta społecznościowego
 - `--register-source-platform <P>` - platforma publikacji, np. `X`, `YouTube` albo `DM`
 - `--register-source-url <URL>` - opcjonalny adres HTTP/HTTPS materiału źródłowego
-- `--register-ai-batch <PATH>` - wczytuje zbiorcze wyniki AI z pliku tekstowego (format: `TICKER: REKOMENDACJA | powód`)
+- `--register-ai-batch <PATH>` - wczytuje zbiorcze wyniki AI z pliku JSON lub tekstowego. Format JSON pozwala przypisać osobno sygnał `BUY`, `SELL` albo `HOLD` do każdego tickera:
+
+  ```json
+  {
+    "model": "gpt-5",
+    "signals": [
+      {"ticker": "XTB.PL", "signal": "BUY"},
+      {"ticker": "CDR.PL", "signal": "SELL"},
+      {"ticker": "PKO.PL", "signal": "HOLD"}
+    ]
+  }
+  ```
+
+  Starszy format JSON z polem `"tickers"` pozostaje obsługiwany i traktuje wszystkie wpisy jako `BUY`. Format tekstowy: `TICKER: REKOMENDACJA | powód`.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
