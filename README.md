@@ -2,6 +2,21 @@
 
 StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznych. System pobiera dane z wielu źródeł, analizuje je modułowo i wysyła alerty do Telegrama.
 
+## Struktura projektu
+
+```text
+StockRadar/
+├── src/        # kod aplikacji
+├── tests/      # testy automatyczne
+├── docs/       # dokumentacja, prompty i zasoby dokumentacyjne
+├── data/       # lokalne dane uruchomieniowe, bez zawartości w Git
+├── config.yaml
+└── README.md
+```
+
+Polecenia należy uruchamiać z głównego katalogu repozytorium. Katalogi `tmp/`
+i `res/` zawierają lokalne artefakty i nie są wersjonowane.
+
 ## Moduły
 
 | Moduł | Kategoria | Sygnały |
@@ -70,7 +85,7 @@ Bot ma blokadę wielokrotnego uruchomienia i zabezpieczenie przed konfliktem `40
 
 ## Web Dashboard
 
-System zawiera interaktywny dashboard Streamlit dostępny przez `app.py`.
+System zawiera interaktywny dashboard Streamlit dostępny przez `src/app.py`.
 
 ### Funkcjonalności:
 - **Wybór spółki**: Lista wszystkich tickerów z `config.yaml`
@@ -86,7 +101,7 @@ System zawiera interaktywny dashboard Streamlit dostępny przez `app.py`.
 
 ### Uruchomienie:
 ```bash
-streamlit run app.py
+streamlit run src/app.py
 ```
 
 ## Opis modułów i logika sygnałów
@@ -955,31 +970,31 @@ Opcja `--no-session` uruchamia aplikację bez zachowania tego stanu.
 Tryb standard (jednorazowy przebieg):
 
 ```bash
-python stock_radar.py
+python src/stock_radar.py
 ```
 
 Tryb harmonogramu:
 
 ```bash
-python stock_radar.py --schedule
+python src/stock_radar.py --schedule
 ```
 
 Tryb harmonogramu z wymuszeniem ignorowania okien czasowych:
 
 ```bash
-python stock_radar.py --schedule --ignore-schedule
+python src/stock_radar.py --schedule --ignore-schedule
 ```
 
 Analiza tylko wybranych spolek:
 
 ```bash
-python stock_radar.py --ticker XTB.PL,CDR.PL
+python src/stock_radar.py --ticker XTB.PL,CDR.PL
 ```
 
 Uruchomienie tylko wybranych modulow:
 
 ```bash
-python stock_radar.py --modules FEED_ESPI,FEED_KNF_SHORT,FEED_RECOMMENDATIONS
+python src/stock_radar.py --modules FEED_ESPI,FEED_KNF_SHORT,FEED_RECOMMENDATIONS
 ```
 
 Wyjscie z aplikacji: **Ctrl+C** (graceful shutdown przez signal handler).
@@ -1089,43 +1104,43 @@ Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`
 
 ```bash
 # harmonogram tylko dla wybranych modulow
-python stock_radar.py --schedule --modules ESPI,KNF_SHORTS,RECOMMENDATIONS
+python src/stock_radar.py --schedule --modules ESPI,KNF_SHORTS,RECOMMENDATIONS
 
 # cichy run pod task/service - bez konsoli i Telegrama
-python stock_radar.py --schedule --silent
+python src/stock_radar.py --schedule --silent
 
 # jednorazowy run dla konkretnej listy spolek
-python stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT_PRICE_CHANGE
+python src/stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT_PRICE_CHANGE
 
 # analiza calego rynku amerykanskiego i dodatkowo wybranej spolki z PL
-python stock_radar.py --tickers *.US,CDR.PL
+python src/stock_radar.py --tickers *.US,CDR.PL
 
 # backfill luk cenowych dla 6 miesiecy
-python stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
+python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
 
 # ręczny zapis sygnału BUY po promptcie AI z WWW
-python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-note "AI WWW daily pick"
+python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-note "AI WWW daily pick"
 
 # ręczny zapis sygnału BUY z nazwą modelu AI
-python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-note "AI WWW daily pick"
+python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-note "AI WWW daily pick"
 
 # ręczny zapis wskazania analityka z platformy X
-python stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
+python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
 
 # backtest sygnalow BUY/SELL z eksportem CSV
-python stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
+python src/stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
 
 # backtest tylko dla mocniejszych sygnalow, z deduplikacja i progiem sukcesu 2%
-python stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --backtest-dedup-days 7 --backtest-success-threshold 2 --backtest-export backtest_results.csv
+python src/stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --backtest-dedup-days 7 --backtest-success-threshold 2 --backtest-export backtest_results.csv
 
 # backtest z analiza AI wynikow (tryb api = odpowiedz z modelu; tryb prompt = gotowy prompt na Telegram)
-python stock_radar.py --backtest-trade-signals --backtest-export backtest_results.csv --backtest-ai-analysis
+python src/stock_radar.py --backtest-trade-signals --backtest-export backtest_results.csv --backtest-ai-analysis
 
 # wyświetlenie wykresu sygnałów z ostatnich 14 dni dla wszystkich modułów (z rolą signal)
-python stock_radar.py --signals-chart-days 14
+python src/stock_radar.py --signals-chart-days 14
 
 # wyświetlenie wykresu sygnałów z 30 dni tylko dla konkretnych modułów
-python stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
+python src/stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
 ```
 
 Przy ręcznym zapisie atrybucja trafia do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`.
@@ -1276,7 +1291,7 @@ Pivot points obliczane są na podstawie High, Low i Close z poprzedniego dnia se
 
 **Poziomy na kolejny dzień (D+1)**
 - `TECH_PIVOT` może działać w trybie utrwalonych poziomów D+1 (`pivot_criteria.use_next_day_frozen_levels: true`).
-- Po zakończonej sesji wyznaczany jest pakiet poziomów na następny dzień i zapisywany w `app_state` (`stock_radar.db`).
+- Po zakończonej sesji wyznaczany jest pakiet poziomów na następny dzień i zapisywany w `app_state` (`data/stock_radar.db`).
 - W kolejnym dniu poziomy są odczytywane z cache i nie są rekalkulowane intraday.
 - Dashboard korzysta z tej samej ścieżki, więc wartości w UI i sygnałach pozostają spójne.
 
