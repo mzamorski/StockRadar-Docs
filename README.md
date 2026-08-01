@@ -815,6 +815,32 @@ Moduł nie ma osobnego analizatora ani harmonogramu. Różni autorzy korzystają
 
 Menu udostępnia zarówno zapis pojedynczego wskazania, jak i opcję **Importuj rekomendacje analityka lub DM z JSON**. Importowana paczka jest zawsze zapisywana w module `REPORT_ANALYST_PICK`. Atrybucja może być wspólna dla płaskiej listy `signals` albo określona osobno dla każdej rekomendacji przez pole `institution`.
 
+Nazwy instytucji są mapowane przez dwa słowniki w SQLite:
+
+- `analyst_institutions` — kanoniczne nazwy DM i innych instytucji analitycznych,
+- `analyst_institution_aliases` — możliwe warianty nazw powiązane przez `institution_id` z nazwą kanoniczną.
+
+Podczas importu klucz aliasu jest niewrażliwy na wielkość liter, znaki diakrytyczne, interpunkcję i nadmiarowe spacje. Przykładowo `DM BOŚ`, `DM BOS`, `BOŚ DM` i `Dom Maklerski BOS` są zapisywane jako `DM BOŚ`. Nieznana instytucja jest automatycznie dodawana jako nowa nazwa kanoniczna wraz z aliasem własnym. Aliasowanie jest stosowane również podczas odczytu historycznych sygnałów, dlatego ranking scala starsze warianty bez przepisywania ich pierwotnego `signal_params.source_name`.
+
+Każda rekomendacja analityczna ma również trwałe powiązanie `trade_signals.analyst_institution_id` → `analyst_institutions.id`. Nowe importy zapisują jednocześnie ID i kanoniczne `source_name`. Inicjalizacja bazy uzupełnia brakujące ID w starszych rekordach na podstawie aliasów; oryginalne `signal_params` pozostają bez zmian.
+
+Przykład ręcznego dodania aliasu w SQLite:
+
+```sql
+INSERT INTO analyst_institution_aliases (
+  institution_id,
+  alias,
+  normalized_alias
+)
+SELECT id, 'BOŚ Securities', 'bos securities'
+FROM analyst_institutions
+WHERE canonical_name = 'DM BOŚ';
+```
+
+Opcja **Sprawdź skuteczność analityków po 3/6/12 miesiącach** pozwala wybrać w menu `3 miesiące`, `6 miesięcy`, `12 miesięcy` albo wszystkie trzy okresy jednocześnie. Wartości techniczne 90, 180 i 365 dni nie są pokazywane użytkownikowi. Dzięki temu rekomendację wystawioną wyłącznie na 12 miesięcy można ocenić tylko po pełnym roku. Backtest obejmuje rekomendacje `BUY` i `SELL`: `BUY` jest trafiony przy dodatniej zmianie kursu, a `SELL` przy ujemnej. Rekomendacje `HOLD` są pomijane, ponieważ ich ocena wymagałaby osobno zdefiniowanego pasma neutralności. Raport uwzględnia wyłącznie horyzonty, które już upłynęły. W konsoli wyświetla tabelę z pozycją, horyzontem, analitykiem, liczbą ocenionych i trafionych rekomendacji, skutecznością oraz średnim wynikiem kierunkowym. Mediana i pozostałe szczegóły są dostępne w plikach `analyst_performance*.csv`, które preset menu zapisuje w systemowym katalogu tymczasowym, w podkatalogu `StockRadar`.
+
+Opcja menu **Wylistuj rekomendacje analityków** udostępnia cztery tabele: wszystkie rekomendacje ze szczegółami, podsumowanie per DM, podsumowanie per spółka oraz podsumowanie per miesiąc. Każdy widok można ograniczyć do 1, 3, 6 lub 12 miesięcy, 2 lat albo całego okresu. Raport korzysta z kanonicznego `analyst_institution_id`, uwzględnia tylko źródła typu `analyst` i pomija konta społecznościowe. W widoku szczegółowym pokazuje również cenę wejścia i cenę docelową, jeżeli zostały zapisane podczas importu.
+
 W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `interval_minutes` ani `active_hours`, jest pomijany przez scheduler oraz przez jednorazowy przebieg analizy.
 
 ---
@@ -1071,7 +1097,25 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   }
   ```
 
-  Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` staje się `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Rekomendacje `ACCUMULATE` są mapowane na `BUY`, a `REDUCE` na `SELL`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału oraz kurs wejścia odpowiadają dacie raportu lub pierwszej kolejnej sesji.
+  Można również przekazać listę takich obiektów, gdy jeden plik zawiera osobne paczki wielu DM. W płaskim formacie pole `date` jest aliasem `report_date`, a opcjonalne `target_price` i `currency` są zachowywane w notatce sygnału. Jeśli podano jednocześnie `date` i `report_date`, obie wartości muszą być identyczne.
+
+  Wymagania płaskiego formatu:
+
+  - główny element: pojedynczy obiekt paczki albo niepusta lista takich obiektów,
+  - paczka: niepusta lista `signals`; `source_name` jest wymagane na poziomie paczki albo osobno przy każdym sygnale,
+  - sygnał: wymagane niepuste `ticker` i `signal`,
+  - pola opcjonalne paczki: `source_type` (domyślnie `analyst`), `source_platform` (domyślnie `DM`) i `recommendation_type` (domyślnie `fundamental`),
+  - pola opcjonalne sygnału: `market`, `date`, `report_date`, `target_price`, `currency`, `entry_price`, `note`, `source_name`, `source_type`, `source_platform`, `source_url` i `recommendation_type`.
+
+  Wartości `signals[].signal` oraz `recommendations_history[].recommendation` są niewrażliwe na wielkość liter i mapowane następująco:
+
+  | Wynik zapisywany | Akceptowane wartości wejściowe |
+  |---|---|
+  | `BUY` | `BUY`, `KUP`, `KUPUJ`, `ACCUMULATE`, `AKUMULUJ`, `OVERWEIGHT`, `PRZEWAŻAJ`, `PRZEWAZAJ` |
+  | `HOLD` | `HOLD`, `TRZYMAJ`, `NEUTRAL`, `NEUTRALNIE` |
+  | `SELL` | `SELL`, `SPRZEDAJ`, `REDUCE`, `REDUKUJ`, `UNDERWEIGHT`, `NIEDOWAŻAJ`, `NIEDOWAZAJ` |
+
+  Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` jest mapowane przez `analyst_institution_aliases` na kanoniczne `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału oraz kurs wejścia odpowiadają dacie raportu lub pierwszej kolejnej sesji.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -1083,6 +1127,10 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-signals <S1,S2,...>` - filtr po polu `signal` (np. `BUY,SELL`)
 - `--backtest-export <PATH.csv>` - eksport CSV wynikow backtestu, rankingow modulow i raportow confidence buckets
 - `--backtest-ai-analysis` - po zakonczeniu backtestu wysyla wyniki do AI (Gemini/OpenAI) w celu analizy; w trybie `prompt` dostarcza gotowy prompt na Telegram
+- `--backtest-completed-horizons-only` - pomija wyniki, dla których pełny horyzont jeszcze nie upłynął; zapobiega ocenianiu świeżych rekomendacji kursem bieżącym
+- `--list-analyst-recommendations` - wyświetla tabelę rekomendacji analityków; bez dodatkowych flag pokazuje wszystkie szczegóły z całego okresu
+- `--analyst-list-view <V>` - wybiera widok raportu: `all`, `dm`, `company` albo `period`
+- `--analyst-list-period <P>` - ogranicza raport do ostatnich `30`, `90`, `180`, `365`, `730` dni albo `all`
 - `--signals-chart-days <D>` - wygeneruj i wyświetl w konsoli dwustronny wykres słupkowy sygnałów z ostatnich D dni
 - `--signals-chart-modules <M1,M2,...>` - wymuś na wykresie konkretne moduły (zamiast domyślnych z rolą `signal`)
 - `--list-signals-days <D>` - wyświetla maksymalnie 10 tickerów z największą liczbą sygnałów z ostatnich D dni; wyniki są agregowane po tickerze i sortowane malejąco według łącznej liczby sygnałów
@@ -1154,6 +1202,9 @@ python src/stock_radar.py --register-analyst-batch tmp/dm_bos.json
 # backtest sygnalow BUY/SELL z eksportem CSV
 python src/stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
 
+# skutecznosc analitykow po 3/6/12 miesiacach; raporty trafiaja do Windows TEMP
+python src/stock_radar.py --backtest-trade-signals --backtest-horizons 90,180,365 --backtest-success-threshold 0 --backtest-modules REPORT_ANALYST_PICK --backtest-signals BUY,SELL --backtest-completed-horizons-only --backtest-export "$env:TEMP/StockRadar/analyst_performance.csv"
+
 # backtest tylko dla mocniejszych sygnalow, z deduplikacja i progiem sukcesu 2%
 python src/stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --backtest-dedup-days 7 --backtest-success-threshold 2 --backtest-export backtest_results.csv
 
@@ -1190,7 +1241,7 @@ ORDER BY signals DESC;
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
 - Domyslne horyzonty sa rozdzielone per typ modułu: fundamentalne maja zwykle `30,60,90,180`, a techniczne `1,7,14,30`.
 - Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
-- Gdy dla docelowego horyzontu brakuje ceny wyjscia (np. sygnal jest zbyt swiezy), backtest uzupelnia exit ostatnia dostepna cena po dacie wejscia zamiast pomijac rekord.
+- Gdy dla docelowego horyzontu brakuje ceny wyjscia, backtest domyślnie uzupełnia exit ostatnią dostępną ceną po dacie wejścia. Flaga `--backtest-completed-horizons-only` wyłącza ten fallback i pomija niedojrzałe horyzonty.
 - Sukces sygnalu liczony jest po `directional_return_pct`, nie po surowym zwrocie; domyslnie potrzeba wyniku powyzej `1.0%`.
 - Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci.
 
