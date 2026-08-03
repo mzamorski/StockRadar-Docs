@@ -200,7 +200,9 @@ Rozpoznaje klasyczne formacje świecowe.
 
 Wykrywa i śledzi luki cenowe na interwale H1. Backfill analizuje także późniejsze
 świece, zapisuje pełne domknięcie luki do poziomu poprzedniego zamknięcia oraz
-wyświetla historyczny udział domknięć osobno dla każdej spółki i kierunku luki.
+wyświetla jedną tabelę z historycznym udziałem domknięć osobno dla każdej spółki
+i kierunku luki. Czas domknięcia jest podawany jako `H` (godziny) w ramach tej
+samej sesji, a po przejściu do kolejnej sesji jako `D` (dni kalendarzowe).
 
 **Dane:** H1 OHLC, SQLite (historia luk)
 
@@ -211,6 +213,7 @@ wyświetla historyczny udział domknięć osobno dla każdej spółki i kierunku
 | 🎯 FILLED | GAP UP: `Low <= poprzednie Close`; GAP DOWN: `High >= poprzednie Close` |
 
 Domyślna minimalna luka: 1.5%, konfigurowalny przez `gap_criteria.min_gap_pct`.
+Ten sam próg jest stosowany w analizie bieżącej i podczas backfillu.
 
 ---
 
@@ -1042,7 +1045,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 
 - `standard`: domyslny przebieg analizy (z opcjonalnym `--schedule`)
 - `silent service`: po podaniu `--silent` aplikacja nie wypisuje logow na konsolę i nie wysyła Telegrama; dalej zapisuje sygnaly i stan do bazy
-- `backfill gaps`: po podaniu `--backfill-gaps` aplikacja wykona backfill i zakonczy proces
+- `backfill gaps`: po podaniu `--backfill-gaps` aplikacja wykona backfill i zakonczy proces; menu pozwala wybrać okres 3, 6 lub 12 miesięcy
 - `backtest trade_signals`: po podaniu `--backtest-trade-signals` aplikacja uruchomi backtest i zakonczy proces
 - `signals chart`: po podaniu `--signals-chart-days` aplikacja wygeneruje dwustronny wykres siły rynkowej (byki vs niedźwiedzie) i zakończy proces
 
@@ -1059,6 +1062,8 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
+- `--list-price-gaps <TICKER>` - wyświetla tabelę luk zapisanych dla spółki
+- `--gap-list-status <STATUS>` - filtr tabeli luk: `unfilled` (domyślnie), `filled` albo `all`
 - `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`)
 - `--register-signal <S>` - sygnał do zapisu (np. `BUY`, `SELL`, `HOLD`)
 - `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
