@@ -198,7 +198,9 @@ Rozpoznaje klasyczne formacje świecowe.
 
 ### TECH_GAPS
 
-Wykrywa i śledzi luki cenowe na interwale H1.
+Wykrywa i śledzi luki cenowe na interwale H1. Backfill analizuje także późniejsze
+świece, zapisuje pełne domknięcie luki do poziomu poprzedniego zamknięcia oraz
+wyświetla historyczny udział domknięć osobno dla każdej spółki i kierunku luki.
 
 **Dane:** H1 OHLC, SQLite (historia luk)
 
@@ -206,7 +208,7 @@ Wykrywa i śledzi luki cenowe na interwale H1.
 |--------|--------|
 | ALERT (GAP UP) | Open > Close poprzedniej świecy o ≥ `min_gap_pct` |
 | ALERT (GAP DOWN) | Open < Close poprzedniej świecy o ≤ `-min_gap_pct` |
-| 🎯 FILLED | Cena wróciła do strefy luki (luka wypełniona) |
+| 🎯 FILLED | GAP UP: `Low <= poprzednie Close`; GAP DOWN: `High >= poprzednie Close` |
 
 Domyślna minimalna luka: 1.5%, konfigurowalny przez `gap_criteria.min_gap_pct`.
 
@@ -1050,6 +1052,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--schedule` - uruchamia petle harmonogramu
 - `--ignore-schedule` - ignoruje `active_hours` i uruchamia aktywne moduly niezaleznie od okien czasu
 - `--silent` - tryb cichy: brak logow konsolowych i brak powiadomien Telegram; sygnaly i dane dalej trafiaja do SQLite
+- Gdy `startup_diagnostics: true` w `config.yaml`, każdy właściwy przebieg aplikacji bez `--silent` wysyła do konsoli i Telegrama diagnostykę procesu: czas, host, użytkownika, PID, interpreter, pełną komendę oraz dane dwóch poziomów procesów nadrzędnych. Wywołania `--help` i `--menu` nie wysyłają diagnostyki. Po zakończeniu śledztwa ustaw `startup_diagnostics: false`. Ułatwia to ustalenie, czy aplikację uruchomił terminal, plik BAT, launcher Pythona czy Harmonogram zadań Windows.
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
 - `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
 - `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US` lub `*.US` dla calego rynku)
@@ -1115,7 +1118,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   | `HOLD` | `HOLD`, `TRZYMAJ`, `NEUTRAL`, `NEUTRALNIE` |
   | `SELL` | `SELL`, `SPRZEDAJ`, `REDUCE`, `REDUKUJ`, `UNDERWEIGHT`, `NIEDOWAŻAJ`, `NIEDOWAZAJ` |
 
-  Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` jest mapowane przez `analyst_institution_aliases` na kanoniczne `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału oraz kurs wejścia odpowiadają dacie raportu lub pierwszej kolejnej sesji.
+  Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` jest mapowane przez `analyst_institution_aliases` na kanoniczne `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału odpowiada dacie raportu, a ceną wejścia jest ostatnie dostępne zamknięcie z tego dnia lub wcześniejszej sesji.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
@@ -1184,7 +1187,7 @@ python src/stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT
 # analiza calego rynku amerykanskiego i dodatkowo wybranej spolki z PL
 python src/stock_radar.py --tickers *.US,CDR.PL
 
-# backfill luk cenowych dla 6 miesiecy
+# backfill luk cenowych dla 6 miesiecy wraz ze statystykami domknięć per spółka
 python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
 
 # ręczny zapis sygnału BUY po promptcie AI z WWW
