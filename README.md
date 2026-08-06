@@ -844,7 +844,7 @@ WHERE canonical_name = 'DM BOŚ';
 
 Opcja **Sprawdź skuteczność analityków po 3/6/12 miesiącach** pozwala wybrać w menu `3 miesiące`, `6 miesięcy`, `12 miesięcy` albo wszystkie trzy okresy jednocześnie. Wartości techniczne 90, 180 i 365 dni nie są pokazywane użytkownikowi. Dzięki temu rekomendację wystawioną wyłącznie na 12 miesięcy można ocenić tylko po pełnym roku. Backtest obejmuje rekomendacje `BUY` i `SELL`: `BUY` jest trafiony przy dodatniej zmianie kursu, a `SELL` przy ujemnej. Rekomendacje `HOLD` są pomijane, ponieważ ich ocena wymagałaby osobno zdefiniowanego pasma neutralności. Raport uwzględnia wyłącznie horyzonty, które już upłynęły. W konsoli wyświetla tabelę z pozycją, horyzontem, analitykiem, liczbą ocenionych i trafionych rekomendacji, skutecznością oraz średnim wynikiem kierunkowym. Mediana i pozostałe szczegóły są dostępne w plikach `analyst_performance*.csv`, które preset menu zapisuje w systemowym katalogu tymczasowym, w podkatalogu `StockRadar`.
 
-Opcja menu **Wylistuj rekomendacje analityków** udostępnia cztery tabele: wszystkie rekomendacje ze szczegółami, podsumowanie per DM, podsumowanie per spółka oraz podsumowanie per miesiąc. Każdy widok można ograniczyć do 1, 3, 6 lub 12 miesięcy, 2 lat albo całego okresu. Raport korzysta z kanonicznego `analyst_institution_id`, uwzględnia tylko źródła typu `analyst` i pomija konta społecznościowe. W widoku szczegółowym pokazuje również cenę wejścia i cenę docelową, jeżeli zostały zapisane podczas importu.
+Opcja menu **Wylistuj rekomendacje analityków** udostępnia pięć tabel: wszystkie rekomendacje ze szczegółami, szczegóły wybranej spółki, podsumowanie per DM, podsumowanie per spółka oraz podsumowanie per miesiąc. Każdy widok można ograniczyć do 1, 3, 6 lub 12 miesięcy, 2 lat albo całego okresu. Dla widoku pojedynczej spółki można podać ticker z sufiksem rynku lub bez niego, np. `CDR.PL` albo `CDR`; tabela pokazuje datę, rekomendację, DM, cenę docelową i opcjonalną notatkę. Raport korzysta z kanonicznego `analyst_institution_id`, uwzględnia tylko źródła typu `analyst` i pomija konta społecznościowe. W widoku wszystkich rekomendacji pokazuje również cenę wejścia i cenę docelową, jeżeli zostały zapisane podczas importu.
 
 W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `interval_minutes` ani `active_hours`, jest pomijany przez scheduler oraz przez jednorazowy przebieg analizy.
 
@@ -1137,8 +1137,9 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-ai-analysis` - po zakonczeniu backtestu wysyla wyniki do AI (Gemini/OpenAI) w celu analizy; w trybie `prompt` dostarcza gotowy prompt na Telegram
 - `--backtest-completed-horizons-only` - pomija wyniki, dla których pełny horyzont jeszcze nie upłynął; zapobiega ocenianiu świeżych rekomendacji kursem bieżącym
 - `--list-analyst-recommendations` - wyświetla tabelę rekomendacji analityków; bez dodatkowych flag pokazuje wszystkie szczegóły z całego okresu
-- `--analyst-list-view <V>` - wybiera widok raportu: `all`, `dm`, `company` albo `period`
+- `--analyst-list-view <V>` - wybiera widok raportu: `all`, `ticker`, `dm`, `company` albo `period`
 - `--analyst-list-period <P>` - ogranicza raport do ostatnich `30`, `90`, `180`, `365`, `730` dni albo `all`
+- `--analyst-list-ticker <T>` - wybiera spółkę dla widoku `ticker`; sufiks rynku jest opcjonalny
 - `--signals-chart-days <D>` - wygeneruj i wyświetl w konsoli dwustronny wykres słupkowy sygnałów z ostatnich D dni
 - `--signals-chart-modules <M1,M2,...>` - wymuś na wykresie konkretne moduły (zamiast domyślnych z rolą `signal`)
 - `--list-signals-days <D>` - wyświetla maksymalnie 10 tickerów z największą liczbą sygnałów z ostatnich D dni; wyniki są agregowane po tickerze i sortowane malejąco według łącznej liczby sygnałów
