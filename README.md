@@ -736,7 +736,7 @@ Klasyfikacja rekomendacji:
 | 🔴 SELL | SPRZEDAJ, REDUKUJ, NIEDOWAŻAJ, SELL, UNDERWEIGHT |
 | 🟡 HOLD | Pozostałe |
 
-Alerty Telegram tylko dla rekomendacji z dzisiaj lub wczoraj.
+Każda pobrana rekomendacja jest zapisywana lub uzupełniana w kanonicznej tabeli `analyst_recommendations`. Alert Telegram jest wysyłany tylko dla nowej rekomendacji z dzisiaj lub wczoraj. Moduł nie tworzy już osobnego rekordu rekomendacji w `trade_signals`.
 
 ---
 
@@ -807,7 +807,7 @@ Generuje jeden "pick dnia" — najlepszą spółkę z listy.
 
 ### REPORT_ANALYST_PICK
 
-Rejestruje ręczne wskazania analityków i kont społecznościowych przez wspólny mechanizm `trade_signals`.
+Udostępnia ręczny import i raportowanie rekomendacji analityków. Rekomendacje DM są zapisywane w `analyst_recommendations`; wskazania kont społecznościowych pozostają ogólnymi sygnałami w `trade_signals`.
 
 - `source_type`: `analyst` albo `social_account`
 - `source_name`: nazwa analityka lub konta (wymagana)
@@ -816,18 +816,18 @@ Rejestruje ręczne wskazania analityków i kont społecznościowych przez wspól
 - `ingestion_channel`: techniczny kanał zapisu, np. `cli` albo `telegram`
 - `recommendation_type`: `fundamental` albo `technical`; brak wartości oznacza `fundamental`
 
-Moduł nie ma osobnego analizatora ani harmonogramu. Różni autorzy korzystają z tej samej funkcji rejestrującej, ale pozostają oddzielnymi źródłami w deduplikacji i statystykach backtestu.
+Moduł nie ma osobnego analizatora ani harmonogramu. Import JSON, zapis ręczny analityka i automat BiznesRadar korzystają z jednego serwisu zapisu. Deduplikacja opiera się na spółce, kanonicznym ID instytucji, dacie raportu i typie rekomendacji; ponowny zapis może uzupełnić brakującą cenę docelową, notatkę lub URL.
 
-Menu udostępnia zarówno zapis pojedynczego wskazania, jak i opcję **Importuj rekomendacje analityka lub DM z JSON**. Importowana paczka jest zawsze zapisywana w module `REPORT_ANALYST_PICK`. Atrybucja może być wspólna dla płaskiej listy `signals` albo określona osobno dla każdej rekomendacji przez pole `institution`.
+Menu udostępnia zarówno zapis pojedynczego wskazania, jak i opcję **Importuj rekomendacje analityka lub DM z JSON**. Atrybucja może być wspólna dla płaskiej listy `signals` albo określona osobno dla każdej rekomendacji przez pole `institution`.
 
 Nazwy instytucji są mapowane przez dwa słowniki w SQLite:
 
 - `analyst_institutions` — kanoniczne nazwy DM i innych instytucji analitycznych,
 - `analyst_institution_aliases` — możliwe warianty nazw powiązane przez `institution_id` z nazwą kanoniczną.
 
-Podczas importu klucz aliasu jest niewrażliwy na wielkość liter, znaki diakrytyczne, interpunkcję i nadmiarowe spacje. Przykładowo `DM BOŚ`, `DM BOS`, `BOŚ DM` i `Dom Maklerski BOS` są zapisywane jako `DM BOŚ`. Nieznana instytucja jest automatycznie dodawana jako nowa nazwa kanoniczna wraz z aliasem własnym. Aliasowanie jest stosowane również podczas odczytu historycznych sygnałów, dlatego ranking scala starsze warianty bez przepisywania ich pierwotnego `signal_params.source_name`.
+Podczas importu klucz aliasu jest niewrażliwy na wielkość liter, znaki diakrytyczne, interpunkcję i nadmiarowe spacje. Przykładowo `DM BOŚ`, `DM BOS`, `BOŚ DM` i `Dom Maklerski BOS` są zapisywane jako `DM BOŚ`. Nieznana instytucja jest automatycznie dodawana jako nowa nazwa kanoniczna wraz z aliasem własnym. To samo mapowanie jest stosowane podczas migracji danych historycznych i budowania rankingu.
 
-Każda rekomendacja analityczna ma również trwałe powiązanie `trade_signals.analyst_institution_id` → `analyst_institutions.id`. Nowe importy zapisują jednocześnie ID i kanoniczne `source_name`. Inicjalizacja bazy uzupełnia brakujące ID w starszych rekordach na podstawie aliasów; oryginalne `signal_params` pozostają bez zmian.
+Każda rekomendacja ma trwałe powiązanie `analyst_recommendations.analyst_institution_id` → `analyst_institutions.id`. Tabela przechowuje bezpośrednio m.in. datę raportu, sygnał, oryginalną treść rekomendacji, cenę docelową i walutę, cenę wejścia, horyzont, notatkę, URL oraz listę kanałów pozyskania. Inicjalizacja bazy idempotentnie migruje historyczne rekordy `REPORT_ANALYST_PICK` i `ALERT_RECOMMENDATIONS`, łącząc dokładne duplikaty i zachowując stare `trade_signals` wyłącznie jako dane historyczne.
 
 Przykład ręcznego dodania aliasu w SQLite:
 
@@ -1105,7 +1105,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   }
   ```
 
-  Można również przekazać listę takich obiektów, gdy jeden plik zawiera osobne paczki wielu DM. W płaskim formacie pole `date` jest aliasem `report_date`, a opcjonalne `target_price` i `currency` są zachowywane w notatce sygnału. Jeśli podano jednocześnie `date` i `report_date`, obie wartości muszą być identyczne.
+  Można również przekazać listę takich obiektów, gdy jeden plik zawiera osobne paczki wielu DM. W płaskim formacie pole `date` jest aliasem `report_date`, a opcjonalne `target_price` i `currency` trafiają do osobnych kolumn tabeli rekomendacji. Jeśli podano jednocześnie `date` i `report_date`, obie wartości muszą być identyczne.
 
   Wymagania płaskiego formatu:
 
@@ -1227,24 +1227,26 @@ python src/stock_radar.py --signals-chart-days 14
 python src/stock_radar.py --signals-chart-days 30 --signals-chart-modules META_CONFLUENCE,TECH_ADX
 ```
 
-Przy ręcznym zapisie atrybucja i znormalizowany `recommendation_type` trafiają do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`. Dla starszych rekordów bez tego pola należy przy odczycie przyjmować `fundamental`.
-Możesz agregować wszystkie rodzaje źródeł wspólnym zapytaniem:
+Przy ręcznym zapisie ogólnych sygnałów atrybucja i znormalizowany `recommendation_type` trafiają do `trade_signals.signal_params`. Flaga `--register-ai-model` pozostaje kompatybilna i automatycznie ustawia `source_type=ai`, `source_name` oraz `ai_model`. Rekomendacje analityków korzystają z osobnych, typowanych kolumn tabeli `analyst_recommendations`.
+
+Przykład agregacji rekomendacji analityków:
 
 ```sql
 SELECT
-  json_extract(signal_params, '$.source_type') AS source_type,
-  json_extract(signal_params, '$.source_name') AS source_name,
-  json_extract(signal_params, '$.source_platform') AS source_platform,
-  COALESCE(json_extract(signal_params, '$.recommendation_type'), 'fundamental') AS recommendation_type,
-  COUNT(*) AS signals
-FROM trade_signals
-WHERE module IN ('REPORT_AI_DAILY_PICK', 'REPORT_ANALYST_PICK')
-  AND signal IN ('BUY', 'SELL', 'HOLD')
-GROUP BY source_type, source_name, source_platform, recommendation_type
-ORDER BY signals DESC;
+  institutions.canonical_name,
+  recommendations.recommendation_type,
+  COUNT(*) AS recommendation_count,
+  SUM(recommendations.target_price IS NOT NULL) AS with_target_price
+FROM analyst_recommendations AS recommendations
+JOIN analyst_institutions AS institutions
+  ON institutions.id = recommendations.analyst_institution_id
+GROUP BY institutions.id, recommendations.recommendation_type
+ORDER BY recommendation_count DESC;
 ```
 
-## Zasady backtestu trade_signals
+## Zasady backtestu sygnałów i rekomendacji
+
+Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALYST_PICK` korzysta z kanonicznej tabeli `analyst_recommendations`.
 
 - Backtest domyslnie ocenia tylko moduly z `module_role: signal`; alerty i raporty sa pomijane.
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
