@@ -829,6 +829,12 @@ Podczas importu klucz aliasu jest niewrażliwy na wielkość liter, znaki diakry
 
 Każda rekomendacja ma trwałe powiązanie `analyst_recommendations.analyst_institution_id` → `analyst_institutions.id`. Tabela przechowuje bezpośrednio m.in. datę raportu, sygnał, oryginalną treść rekomendacji, cenę docelową i walutę, cenę wejścia, horyzont, notatkę, URL oraz listę kanałów pozyskania. Inicjalizacja bazy idempotentnie migruje historyczne rekordy `REPORT_ANALYST_PICK` i `ALERT_RECOMMENDATIONS`, łącząc dokładne duplikaty i zachowując stare `trade_signals` wyłącznie jako dane historyczne.
 
+Szczegółowy widok wybranej spółki pobiera dzienne notowania OHLC z Yahoo Finance. Dla rekomendacji z ceną docelową pokazuje procentową zmianę targetu względem ceny wejścia oraz sprawdza, czy target został osiągnięty. Dla targetu powyżej ceny wejścia używane jest dzienne maksimum (`High`), a dla targetu poniżej ceny wejścia dzienne minimum (`Low`), dzięki czemu trafienie intraday nie jest pomijane. Raport podaje pierwszą datę osiągnięcia celu i liczbę dni kalendarzowych od publikacji.
+
+Notowania Yahoo są cache'owane zarówno w pamięci procesu, jak i trwale w osobnej bazie `data/yahoo_cache.db`. Klucz cache'u obejmuje symbol Yahoo, okres i interwał. Szczegółowy raport rekomendacji korzysta z wpisu przez godzinę, więc ponowne wyświetlenie raportu — także w kolejnym procesie CLI — nie odpytuje ponownie Yahoo. Pozostałe moduły zachowują domyślny TTL 60 sekund, aby alerty i widoki intraday nie pracowały na zbyt starym kursie. Cache jest techniczny i może zostać bezpiecznie usunięty; nie stanowi części kanonicznych danych aplikacji.
+
+Panel Web udostępnia widok **Rekomendacje DM**. Pozwala filtrować kanoniczne rekomendacje po spółce oraz edytować datę publikacji, sygnał, treść rekomendacji, cenę wejścia, cenę docelową i jej walutę, horyzont oraz notatkę. Zapis odbywa się po ID istniejącego rekordu i dodaje kanał `web_ui` do `ingestion_sources`, dzięki czemu nie tworzy nowej rekomendacji. Zmiana daty aktualizuje także fingerprint rekordu i jest blokowana, jeśli spowodowałaby duplikat. Rekomendację można trwale usunąć w osobnej strefie niebezpiecznej po zaznaczeniu potwierdzenia.
+
 Przykład ręcznego dodania aliasu w SQLite:
 
 ```sql
