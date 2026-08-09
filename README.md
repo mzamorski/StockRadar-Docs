@@ -1124,7 +1124,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
 - `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
 - `--gap-backtest-export <CSV>` - eksportuje pojedyncze transakcje i MAE/MFE
-- `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`)
+- `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`); wartość jest walidowana przed pobraniem ceny i zapisem
 - `--register-signal <S>` - sygnał do zapisu (np. `BUY`, `SELL`, `HOLD`)
 - `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
 - `--register-note <TXT>` - notatka opisująca kontekst decyzji
@@ -1187,15 +1187,19 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
 - `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
-- `--backtest-success-threshold <P>` - prog sukcesu w procentach; transakcja jest liczona jako trafiona, gdy `directional_return_pct > P`; domyslnie `1.0`
-- `--backtest-min-confidence <C>` - filtruje backtest do sygnalow z `confidence_score >= C`
+- `--backtest-success-threshold <P>` - prog sukcesu w procentach; transakcja jest liczona jako trafiona, gdy `net_directional_return_pct > P`; domyslnie `1.0`
+- `--backtest-min-confidence <C>` - filtruje backtest do sygnalow z `confidence_score >= C`; wartość `0` wyłącza filtr i obejmuje także rekordy bez `confidence_score`
+- `--backtest-transaction-cost-pct <P>` - łączny koszt wejścia, wyjścia i poślizgu odejmowany od każdej transakcji; domyślnie `0.2%`
+- `--backtest-entry-execution <M>` - sposób realizacji wejścia: `next_session_close` (domyślny, bez użycia ceny niedostępnej po publikacji sygnału) albo zgodny wstecznie `recorded_price`
+- `--backtest-min-ranking-trades <N>` - minimalna liczba transakcji potrzebna do przyznania modułowi miejsca w rankingu; domyślnie `30`
 - `--backtest-from <YYYY-MM-DD>` - data poczatkowa filtrowania sygnalow
 - `--backtest-to <YYYY-MM-DD>` - data koncowa filtrowania sygnalow
 - `--backtest-modules <M1,M2,...>` - filtr po polu `module` w `trade_signals`
 - `--backtest-signals <S1,S2,...>` - filtr po polu `signal` (np. `BUY,SELL`)
 - `--backtest-export <PATH.csv>` - eksport CSV wynikow backtestu, rankingow modulow i raportow confidence buckets
 - `--backtest-ai-analysis` - po zakonczeniu backtestu wysyla wyniki do AI (Gemini/OpenAI) w celu analizy; w trybie `prompt` dostarcza gotowy prompt na Telegram
-- `--backtest-completed-horizons-only` - pomija wyniki, dla których pełny horyzont jeszcze nie upłynął; zapobiega ocenianiu świeżych rekomendacji kursem bieżącym
+- `--backtest-completed-horizons-only` - zgodna wstecznie flaga wymuszająca zachowanie, które jest obecnie domyślne: pomijanie niedojrzałych horyzontów
+- `--backtest-allow-incomplete-horizons` - jawny opt-in do wyceny niedojrzałych horyzontów ostatnim dostępnym kursem; rekordy otrzymują `is_horizon_complete=false` i rzeczywisty `actual_holding_days`
 - `--list-analyst-recommendations` - wyświetla tabelę rekomendacji analityków; bez dodatkowych flag pokazuje wszystkie szczegóły z całego okresu
 - `--analyst-list-view <V>` - wybiera widok raportu: `all`, `ticker`, `dm`, `company` albo `period`
 - `--analyst-list-period <P>` - ogranicza raport do ostatnich `30`, `90`, `180`, `365`, `730` dni albo `all`
@@ -1272,7 +1276,7 @@ python src/stock_radar.py --register-analyst-batch tmp/dm_bos.json
 python src/stock_radar.py --backtest-trade-signals --backtest-horizons 1,7,30,90 --backtest-signals BUY,SELL --backtest-export backtest_results.csv
 
 # skutecznosc analitykow po 3/6/12 miesiacach; raporty trafiaja do Windows TEMP
-python src/stock_radar.py --backtest-trade-signals --backtest-horizons 90,180,365 --backtest-success-threshold 0 --backtest-modules REPORT_ANALYST_PICK --backtest-signals BUY,SELL --backtest-completed-horizons-only --backtest-export "$env:TEMP/StockRadar/analyst_performance.csv"
+python src/stock_radar.py --backtest-trade-signals --backtest-horizons 90,180,365 --backtest-success-threshold 0 --backtest-modules REPORT_ANALYST_PICK --backtest-signals BUY,SELL --backtest-export "$env:TEMP/StockRadar/analyst_performance.csv"
 
 # backtest tylko dla mocniejszych sygnalow, z deduplikacja i progiem sukcesu 2%
 python src/stock_radar.py --backtest-trade-signals --backtest-min-confidence 60 --backtest-dedup-days 7 --backtest-success-threshold 2 --backtest-export backtest_results.csv
@@ -1312,9 +1316,14 @@ Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALY
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
 - Domyslne horyzonty sa rozdzielone per typ modułu: fundamentalne maja zwykle `30,60,90,180`, a techniczne `1,7,14,30`.
 - Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
-- Gdy dla docelowego horyzontu brakuje ceny wyjscia, backtest domyślnie uzupełnia exit ostatnią dostępną ceną po dacie wejścia. Flaga `--backtest-completed-horizons-only` wyłącza ten fallback i pomija niedojrzałe horyzonty.
-- Sukces sygnalu liczony jest po `directional_return_pct`, nie po surowym zwrocie; domyslnie potrzeba wyniku powyzej `1.0%`.
-- Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci.
+- W panelu Web kierunek „Domyślne (Long + Short)” obejmuje wyłącznie sygnały kierunkowe z mapowania `backtest_criteria.signal_mapping`; neutralne `HOLD` nie są traktowane jak transakcje long.
+- Backtest domyślnie pomija sygnały, dla których pełny horyzont jeszcze nie upłynął. Jawna flaga `--backtest-allow-incomplete-horizons` włącza wycenę mark-to-market ostatnim dostępnym kursem; takie rekordy są oznaczone `is_horizon_complete=false` i zawierają rzeczywisty `actual_holding_days`.
+- Domyślne wejście następuje po sygnale, na zamknięciu następnej dostępnej sesji. Docelowy horyzont jest liczony od faktycznej daty wejścia, a wyjście po pierwszym dostępnym zamknięciu w dniu docelowym lub później.
+- `directional_return_pct` jest zwrotem brutto zgodnym z kierunkiem sygnału. `net_directional_return_pct` odejmuje ustawiony koszt round-trip i jest podstawą metryk decyzyjnych.
+- `profit_probability_pct` odpowiada na pytanie, jaki odsetek transakcji zakończył się wynikiem netto powyżej zera. `win_rate_pct` oznacza odsetek transakcji, które przekroczyły `--backtest-success-threshold`; przy progu `3%` zysk `+2%` netto jest więc transakcją zyskowną, ale nie jest trafieniem celu.
+- Ranking modułów jest liczony osobno dla każdego horyzontu na wszystkich zakończonych wynikach danego horyzontu. Małe próby pozostają widoczne, ale poniżej `min_ranking_trades` nie otrzymują miejsca. Kolejność kwalifikujących się modułów opiera się najpierw na dolnej granicy 95% przedziału średniego zwrotu netto, a następnie na dolnej granicy szansy zysku i liczbie transakcji.
+- Widok „Czas trzymania” korzysta z kohorty dopasowanej: dla danego modułu zachowuje identyczne `signal_id` zakończone we wszystkich wybranych horyzontach. Jeżeli zwykłe zestawienie ma 100 transakcji dla 14 dni i 4 dla 90 dni, zwykłe metryki 90-dniowe są liczone tylko z 4 dojrzałych transakcji; porównanie czasu trzymania liczy zarówno 14, jak i 90 dni na tych samych 4 sygnałach.
+- Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci. Próg `0` oznacza brak filtra i zachowuje również historyczne rekordy z `confidence_score = NULL`; dodatni próg pomija rekordy bez wyniku.
 - Panel Web stylizuje maksymalnie 5000 pierwszych transakcji, aby duże backtesty nie przekraczały limitu Pandas Styler. Pełny zbiór pozostaje dostępny w eksporcie CSV.
 
 Pliki CSV po eksporcie backtestu:
@@ -1322,8 +1331,10 @@ Pliki CSV po eksporcie backtestu:
 - `backtest_results.csv` - wszystkie transakcje wynikowe (`outcomes`)
 - `backtest_results_summary.csv` - podsumowanie skutecznosci per horyzont
 - `backtest_results_by_module.csv` - statystyki modułów per horyzont
-- `backtest_results_module_ranking.csv` - ranking ogolny skutecznosci modułów
-- `backtest_results_module_ranking_by_horizon.csv` - ranking modułów osobno dla kazdego horyzontu
+- `backtest_results_module_ranking.csv` - historyczny przekrojowy ranking ogólny, zachowany dla zgodności eksportu; do decyzji używaj rankingu per horyzont
+- `backtest_results_module_ranking_by_horizon.csv` - decyzyjny ranking modułów osobno dla każdego horyzontu, z metrykami netto, przedziałami 95% i oceną wiarygodności próby
+- `backtest_results_matched_horizon_outcomes.csv` - transakcje ze wspólnej kohorty zakończonej we wszystkich wybranych horyzontach
+- `backtest_results_matched_horizon_summary.csv` - porównanie efektu czasu trzymania na identycznych sygnałach
 - `backtest_results_source_ranking.csv` - ranking modeli, analityków i kont społecznościowych
 - `backtest_results_source_ranking_by_horizon.csv` - ranking źródeł osobno dla każdego horyzontu
 - `backtest_results_confidence_buckets.csv` - statystyki confidence bucketow lacznie dla wszystkich horyzontow
