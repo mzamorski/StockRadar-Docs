@@ -1192,6 +1192,15 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-transaction-cost-pct <P>` - łączny koszt wejścia, wyjścia i poślizgu odejmowany od każdej transakcji; domyślnie `0.2%`
 - `--backtest-entry-execution <M>` - sposób realizacji wejścia: `next_session_close` (domyślny, bez użycia ceny niedostępnej po publikacji sygnału) albo zgodny wstecznie `recorded_price`
 - `--backtest-min-ranking-trades <N>` - minimalna liczba transakcji potrzebna do przyznania modułowi miejsca w rankingu; domyślnie `30`
+- `--backtest-oos-test-fraction <F>` - udział najnowszych dat przeznaczony na zamrożony holdout OOS, np. `0.30`
+- `--backtest-oos-min-train-trades <N>` - minimalna liczba znanych wyników w train wymagana do wyboru modułu; domyślnie `30`
+- `--backtest-oos-min-test-trades <N>` - minimalna liczba wyników w oknie OOS wymagana do oceny; domyślnie `10`
+- `--backtest-walk-forward-train-days <N>` - minimalna historia przed pierwszym foldem anchored walk-forward; domyślnie `90`
+- `--backtest-walk-forward-test-days <N>` - długość pełnego okna testowego; domyślnie `30`
+- `--backtest-walk-forward-step-days <N>` - krok między niepokrywającymi się foldami; domyślnie `30`
+- `--backtest-fdr-alpha <F>` - maksymalny poziom false discovery rate po korekcie Benjamini-Hochberga; domyślnie `0.05`
+- `--backtest-disable-oos-validation` - wyłącza raporty holdout i walk-forward
+- `--backtest-disable-benchmark` - wyłącza obliczanie relatywnego wyniku względem WIG20 lub S&P 500
 - `--backtest-from <YYYY-MM-DD>` - data poczatkowa filtrowania sygnalow
 - `--backtest-to <YYYY-MM-DD>` - data koncowa filtrowania sygnalow
 - `--backtest-modules <M1,M2,...>` - filtr po polu `module` w `trade_signals`
@@ -1323,6 +1332,12 @@ Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALY
 - `profit_probability_pct` odpowiada na pytanie, jaki odsetek transakcji zakończył się wynikiem netto powyżej zera. `win_rate_pct` oznacza odsetek transakcji, które przekroczyły `--backtest-success-threshold`; przy progu `3%` zysk `+2%` netto jest więc transakcją zyskowną, ale nie jest trafieniem celu.
 - Ranking modułów jest liczony osobno dla każdego horyzontu na wszystkich zakończonych wynikach danego horyzontu. Małe próby pozostają widoczne, ale poniżej `min_ranking_trades` nie otrzymują miejsca. Kolejność kwalifikujących się modułów opiera się najpierw na dolnej granicy 95% przedziału średniego zwrotu netto, a następnie na dolnej granicy szansy zysku i liczbie transakcji.
 - Widok „Czas trzymania” korzysta z kohorty dopasowanej: dla danego modułu zachowuje identyczne `signal_id` zakończone we wszystkich wybranych horyzontach. Jeżeli zwykłe zestawienie ma 100 transakcji dla 14 dni i 4 dla 90 dni, zwykłe metryki 90-dniowe są liczone tylko z 4 dojrzałych transakcji; porównanie czasu trzymania liczy zarówno 14, jak i 90 dni na tych samych 4 sygnałach.
+- Walidacja holdout jest wykonywana osobno dla każdego horyzontu. Najnowsza część dat wejścia stanowi OOS, a ranking modułów powstaje wyłącznie na starszej części train. Wynik OOS nigdy nie zmienia `train_rank`.
+- Podział jest purged: transakcja rozpoczęta w train trafia do statystyk treningowych tylko wtedy, gdy jej `exit_date` przypada przed początkiem OOS. Wyniki, które nie były jeszcze znane, są raportowane jako `purged_outcomes` i usuwane z train.
+- Anchored walk-forward zaczyna się domyślnie po 90 dniach historii i ocenia kolejne pełne, niepokrywające się okna po 30 dni. Niepełne końcowe okno nie jest raportowane.
+- Dodatni wynik OOS jest testowany jednostronnie, a wartości p są korygowane metodą Benjamini-Hochberga osobno w każdej rodzinie horyzont/fold. `passes_oos_net_fdr` oznacza, że wynik netto przetrwał ustawiony limit FDR; brak flagi oznacza wynik niepotwierdzony, a nie automatycznie stratny.
+- Dla tickerów GPW benchmarkiem jest `WIG20.WA`, a dla USA `^GSPC`. `excess_return_pct` porównuje zwrot kierunkowy pozycji ze zwrotem benchmarku w tym samym kierunku i okresie. Przy jednakowym koszcie round-trip koszt odejmuje się po obu stronach i nie zmienia alfy.
+- Panel Web ma osobną kartę „Out-of-sample” z pełnym holdoutem, modułami wybranymi na train, foldami walk-forward, alfą oraz FDR. Confidence buckety są weryfikowane OOS niezależnie od rankingu in-sample.
 - Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci. Próg `0` oznacza brak filtra i zachowuje również historyczne rekordy z `confidence_score = NULL`; dodatni próg pomija rekordy bez wyniku.
 - Panel Web stylizuje maksymalnie 5000 pierwszych transakcji, aby duże backtesty nie przekraczały limitu Pandas Styler. Pełny zbiór pozostaje dostępny w eksporcie CSV.
 
@@ -1335,6 +1350,14 @@ Pliki CSV po eksporcie backtestu:
 - `backtest_results_module_ranking_by_horizon.csv` - decyzyjny ranking modułów osobno dla każdego horyzontu, z metrykami netto, przedziałami 95% i oceną wiarygodności próby
 - `backtest_results_matched_horizon_outcomes.csv` - transakcje ze wspólnej kohorty zakończonej we wszystkich wybranych horyzontach
 - `backtest_results_matched_horizon_summary.csv` - porównanie efektu czasu trzymania na identycznych sygnałach
+- `backtest_results_oos_module_validation.csv` - purged holdout modułów: train, OOS, alfa i FDR per horyzont
+- `backtest_results_oos_confidence_validation.csv` - holdout confidence bucketów per horyzont
+- `backtest_results_oos_module_confidence_validation.csv` - holdout kombinacji moduł + confidence bucket
+- `backtest_results_oos_selected_modules.csv` - wyłącznie moduły wybrane na train, bez selekcji po wyniku OOS
+- `backtest_results_walk_forward_module_validation.csv` - wszystkie moduły w kolejnych foldach walk-forward
+- `backtest_results_walk_forward_confidence_validation.csv` - confidence buckety w kolejnych foldach
+- `backtest_results_walk_forward_module_confidence_validation.csv` - kombinacje moduł + bucket w kolejnych foldach
+- `backtest_results_walk_forward_selected_modules.csv` - zwycięzca train każdego horyzontu i folda wraz z późniejszym wynikiem OOS
 - `backtest_results_source_ranking.csv` - ranking modeli, analityków i kont społecznościowych
 - `backtest_results_source_ranking_by_horizon.csv` - ranking źródeł osobno dla każdego horyzontu
 - `backtest_results_confidence_buckets.csv` - statystyki confidence bucketow lacznie dla wszystkich horyzontow
