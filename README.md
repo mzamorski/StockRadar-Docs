@@ -208,12 +208,27 @@ samej sesji, a po przejściu do kolejnej sesji jako `D` (dni kalendarzowe).
 
 | Sygnał | Warunki |
 |--------|--------|
+| BUY (GAP DOWN) | Open sesji < poprzednie Close o ≥ `min_gap_pct`; sygnał również przy domknięciu w pierwszej H1 |
 | ALERT (GAP UP) | Open > Close poprzedniej świecy o ≥ `min_gap_pct` |
 | ALERT (GAP DOWN) | Open < Close poprzedniej świecy o ≤ `-min_gap_pct` |
 | 🎯 FILLED | GAP UP: `Low <= poprzednie Close`; GAP DOWN: `High >= poprzednie Close` |
 
 Domyślna minimalna luka: 1.5%, konfigurowalny przez `gap_criteria.min_gap_pct`.
 Ten sam próg jest stosowany w analizie bieżącej i podczas backfillu.
+
+Moduł zapisuje long-only setupy mean-reversion do `trade_signals` jako
+`TECH_GAPS` i wysyła je na Telegram. Dla luki spadkowej zapisuje `BUY`, z celem
+na poprzednim zamknięciu. Sygnał powstaje na świecy otwarcia sesji natychmiast
+po wykryciu luki. Domknięcie w tej samej świecy H1 nie blokuje sygnału.
+`TECH_GAPS` może uczestniczyć w `META_CONFLUENCE` jak pozostałe moduły
+techniczne. Luki wzrostowe pozostają w historii luk, ale przy `long_only: true`
+nie tworzą transakcyjnego sygnału `SELL`.
+
+Dedykowany backtest gap-fill zakłada wejście po cenie otwarcia luki, brak
+stop-lossa i maksymalnie sześć miesięcy kalendarzowych na domknięcie. Uwzględnia
+koszty transakcyjne oraz MAE/MFE. Luki bez pełnego sześciomiesięcznego okresu
+obserwacji są oznaczane jako ocenzurowane i nie trafiają do mianownika
+statystyki domknięć.
 
 ---
 
@@ -976,6 +991,14 @@ fundamental_criteria:
 ```yaml
 gap_criteria:
   min_gap_pct: 1.5  # Minimalna wielkość luki (%)
+
+gap_strategy:
+  trade_signals_enabled: true
+  signal_module_name: TECH_GAPS
+  session_open_times: {PL: "09:00", US: "09:30"}
+  long_only: true
+  max_holding_months: 6
+  transaction_cost_pct: 0.2
 ```
 
 ### Rozbieżności techniczne (TECH_DIVERGENCE)
@@ -1092,8 +1115,15 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
+- `--backfill-gap-signals` - idempotentnie zapisuje historyczne luki sesyjne `DOWN` jako `TECH_GAPS / BUY` w `trade_signals`
 - `--list-price-gaps <TICKER>` - wyświetla tabelę luk zapisanych dla spółki
 - `--gap-list-status <STATUS>` - filtr tabeli luk: `unfilled` (domyślnie), `filled` albo `all`
+- `--backtest-gap-fill` - uruchamia dedykowany backtest strategii domykania luk
+- `--gap-backtest-period <PERIOD>` - okres danych H1, np. `1y`, `2y`; domyślnie `2y`
+- `--gap-min-pct <PCT>` - nadpisuje minimalną wielkość luki
+- `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
+- `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
+- `--gap-backtest-export <CSV>` - eksportuje pojedyncze transakcje i MAE/MFE
 - `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`)
 - `--register-signal <S>` - sygnał do zapisu (np. `BUY`, `SELL`, `HOLD`)
 - `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
@@ -1285,6 +1315,7 @@ Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALY
 - Gdy dla docelowego horyzontu brakuje ceny wyjscia, backtest domyślnie uzupełnia exit ostatnią dostępną ceną po dacie wejścia. Flaga `--backtest-completed-horizons-only` wyłącza ten fallback i pomija niedojrzałe horyzonty.
 - Sukces sygnalu liczony jest po `directional_return_pct`, nie po surowym zwrocie; domyslnie potrzeba wyniku powyzej `1.0%`.
 - Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci.
+- Panel Web stylizuje maksymalnie 5000 pierwszych transakcji, aby duże backtesty nie przekraczały limitu Pandas Styler. Pełny zbiór pozostaje dostępny w eksporcie CSV.
 
 Pliki CSV po eksporcie backtestu:
 
