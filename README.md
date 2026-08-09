@@ -795,13 +795,37 @@ Wyniki są cachowane w `session_state.db` i alerty Telegram wysyłane tylko dla 
 
 ### REPORT_AI_DAILY_PICK
 
-Generuje jeden "pick dnia" — najlepszą spółkę z listy.
+Generuje najwyżej jeden "pick dnia" z aktywnych tickerów GPW w konfiguracji.
 
-**Model:** Google Gemini (raz dziennie, o skonfigurowanej godzinie)
+**Model:** Google Gemini z obowiązkowym Google Search grounding.
 
-- Analizuje wszystkie tickery z listy i wybiera jeden
+- Wstawia bieżącą datę do promptu; prompt nie zawiera zaszytego roku
+- Waliduje ticker, datę kursu, datę raportu, confidence i metryki sektorowe
+- Wymaga co najmniej dwóch źródeł Google Search dla sygnału `PICK`
+- Oznacza automatyczny zapis w `signal_params` przez `manual: false`
+- Stosuje osobne kryteria dla finansów, growth, value/dividend i spółek cyklicznych
+- Zwraca `NO_PICK` bez sygnału transakcyjnego, gdy dane lub przewaga są niewystarczające
+- Odrzuca odpowiedź bez wyszukiwania zamiast ponawiać ją z wiedzy modelu
+- Zapisuje pełne metryki, tezę, ryzyka i źródła w komunikacie
 - Działa w trybie `api` (Gemini) lub `prompt` (gotowy prompt na Telegram)
-- Wynik cachowany — nie odpala się drugi raz tego samego dnia
+
+Jednorazowe uruchomienie niezależnie od okna harmonogramu:
+
+```powershell
+.\.venv\Scripts\python.exe src\stock_radar.py --modules REPORT_AI_DAILY_PICK --ignore-schedule
+```
+
+Dodaj `--no-session`, aby świadomie powtórzyć próbę tego samego dnia bez trwałego
+stanu i deduplikacji alertu.
+
+Konfiguracja modelu jest niezależna w `ai.daily_pick_model_name`. Integracja używa
+pakietu `google-genai` i narzędzia `google_search`. Model innego dostawcy nie może
+być użyty dla Daily Pick, ponieważ nie zapewnia tej ścieżki groundingu.
+Gemini 3 wymusza schemat JSON bezpośrednio w jednym wywołaniu API. Dla Gemini 2.5
+połączenie `google_search` ze schematem odpowiedzi nie jest obsługiwane, dlatego
+integracja wykonuje dwa etapy: badanie ze źródłami przez Google Search, a następnie
+formatowanie zebranego materiału do JSON ze schematem. Wynik jest dodatkowo
+rygorystycznie walidowany lokalnie przed utworzeniem sygnału.
 
 ---
 
