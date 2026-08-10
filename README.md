@@ -62,7 +62,7 @@ Na potrzeby analizy i porównywania skuteczności moduły oraz sygnały należy 
 
 Określenie **moduły heurystyczne** jest poprawne dla modułów regułowych. Same wzory wskaźników i modeli, np. RSI, ADX, Piotroski F-Score, DCF lub EPV, są obliczeniami ilościowymi; heurystyczna jest ich interpretacja poprzez ustalone progi, punkty i wagi prowadzące do sygnału `BUY`, `SELL` lub `HOLD`.
 
-Wynik `confidence_score` w zakresie 0–100 jest indeksem heurystycznym, a nie bezpośrednim prawdopodobieństwem sukcesu. Może być interpretowany probabilistycznie dopiero po kalibracji na wynikach backtestu.
+Wynik `confidence_score` w zakresie 0–100 pozostaje indeksem heurystycznym, a nie bezpośrednim prawdopodobieństwem sukcesu. Backtest tworzy osobne `calibrated_probability_pct`: monotoniczną estymację szansy dodatniego wyniku netto, uczoną na starszych transakcjach i ocenianą wyłącznie out-of-sample. Można ją interpretować probabilistycznie tylko wtedy, gdy próba OOS jest wystarczająca i `passes_calibration_check=true`.
 
 Przy porównywaniu jakości predykcyjnej zalecany jest podział na `HEURISTIC`, `AI` i `EXTERNAL`. Sygnały `INFORMATIONAL` powinny być analizowane oddzielnie, ponieważ zazwyczaj nie zawierają kierunkowej prognozy inwestycyjnej.
 
@@ -1199,7 +1199,13 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backtest-walk-forward-test-days <N>` - długość pełnego okna testowego; domyślnie `30`
 - `--backtest-walk-forward-step-days <N>` - krok między niepokrywającymi się foldami; domyślnie `30`
 - `--backtest-fdr-alpha <F>` - maksymalny poziom false discovery rate po korekcie Benjamini-Hochberga; domyślnie `0.05`
+- `--backtest-calibration-min-module-trades <N>` - minimalna liczba wyników train z confidence wymagana dla kalibratora moduł + horyzont; domyślnie `30`
+- `--backtest-calibration-min-horizon-trades <N>` - minimalna próba dla zapasowego kalibratora wspólnego dla horyzontu; domyślnie `50`
+- `--backtest-calibration-min-unique-scores <N>` - minimalna liczba różnych wartości confidence w train; domyślnie `3`
+- `--backtest-calibration-reliability-bins <N>` - liczba przedziałów raportu reliability; domyślnie `10`
+- `--backtest-calibration-prior-strength <F>` - siła wygładzania prawdopodobieństw do bazowej częstości train; domyślnie `10`
 - `--backtest-disable-oos-validation` - wyłącza raporty holdout i walk-forward
+- `--backtest-disable-confidence-calibration` - wyłącza kalibrację confidence w holdout i walk-forward
 - `--backtest-disable-benchmark` - wyłącza obliczanie relatywnego wyniku względem WIG20 lub S&P 500
 - `--backtest-from <YYYY-MM-DD>` - data poczatkowa filtrowania sygnalow
 - `--backtest-to <YYYY-MM-DD>` - data koncowa filtrowania sygnalow
@@ -1325,6 +1331,11 @@ Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALY
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
 - Domyslne horyzonty sa rozdzielone per typ modułu: fundamentalne maja zwykle `30,60,90,180`, a techniczne `1,7,14,30`.
 - Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
+- Przed obliczeniami działa nieinwazyjny audyt jakości. Rekordy z nieprawidłowym tickerem, pustym modułem lub sygnałem, nieparsowalną albo przyszłą datą, niespójną datą/czasem albo bez jednoznacznego kierunku są domyślnie wykluczane z próby, lecz pozostają bez zmian w bazie wraz z powodem widocznym w raporcie.
+- Neutralne `HOLD`, `WAIT`, `NEUTRAL` i nieznane nazwy sygnałów nie są automatycznie uznawane za pozycje long. Kierunek jest przypisywany wyłącznie przez jawne mapowanie kanonicznych sygnałów long/short.
+- Brak historycznego `confidence_score`, atrybucji źródła albo ceny zapisanej przy sygnale jest raportowany, ale nie unieważnia transakcji. Brak ceny zapisanej nie przeszkadza domyślnemu wejściu po cenie zamknięcia następnej sesji; brak confidence ogranicza jedynie pokrycie kalibracji.
+- Audyt rejestruje również problemy wykryte podczas wyceny: brak szeregu rynkowego, ceny wejścia lub ceny wyjścia oznacza `outcome_unresolved`, natomiast brak benchmarku pozostawia wynik absolutny i wyłącza tylko ocenę alfy.
+- Granica zapisu nowych sygnałów normalizuje ticker, moduł i sygnał, odrzuca ticker niebędący symbolem rynkowym oraz zapisuje niepoprawną cenę lub confidence spoza zakresu jako `NULL`. Nie wykonuje automatycznej korekty ani usuwania starych rekordów.
 - W panelu Web kierunek „Domyślne (Long + Short)” obejmuje wyłącznie sygnały kierunkowe z mapowania `backtest_criteria.signal_mapping`; neutralne `HOLD` nie są traktowane jak transakcje long.
 - Backtest domyślnie pomija sygnały, dla których pełny horyzont jeszcze nie upłynął. Jawna flaga `--backtest-allow-incomplete-horizons` włącza wycenę mark-to-market ostatnim dostępnym kursem; takie rekordy są oznaczone `is_horizon_complete=false` i zawierają rzeczywisty `actual_holding_days`.
 - Domyślne wejście następuje po sygnale, na zamknięciu następnej dostępnej sesji. Docelowy horyzont jest liczony od faktycznej daty wejścia, a wyjście po pierwszym dostępnym zamknięciu w dniu docelowym lub później.
@@ -1338,7 +1349,13 @@ Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALY
 - Dodatni wynik OOS jest testowany jednostronnie, a wartości p są korygowane metodą Benjamini-Hochberga osobno w każdej rodzinie horyzont/fold. `passes_oos_net_fdr` oznacza, że wynik netto przetrwał ustawiony limit FDR; brak flagi oznacza wynik niepotwierdzony, a nie automatycznie stratny.
 - Dla tickerów GPW benchmarkiem jest `WIG20.WA`, a dla USA `^GSPC`. `excess_return_pct` porównuje zwrot kierunkowy pozycji ze zwrotem benchmarku w tym samym kierunku i okresie. Przy jednakowym koszcie round-trip koszt odejmuje się po obu stronach i nie zmienia alfy.
 - Panel Web ma osobną kartę „Out-of-sample” z pełnym holdoutem, modułami wybranymi na train, foldami walk-forward, alfą oraz FDR. Confidence buckety są weryfikowane OOS niezależnie od rankingu in-sample.
-- Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci. Próg `0` oznacza brak filtra i zachowuje również historyczne rekordy z `confidence_score = NULL`; dodatni próg pomija rekordy bez wyniku.
+- Kalibrator confidence jest dopasowywany oddzielnie w każdym podziale i horyzoncie metodą regresji izotonicznej PAVA. Preferuje model `module_horizon`; gdy próba modułu jest zbyt mała, może użyć oznaczonego `horizon_fallback`. Model nie powstaje przy zbyt małej próbie, zbyt małej liczbie różnych score albo tylko jednej klasie wyników.
+- Nowe sygnały `REPORT_AI_DAILY_PICK` zapisują indywidualny confidence konkretnego wyboru jako `confidence_score`, dzięki czemu przyszła próba zawiera zmienność potrzebną do kalibracji. Historyczne `NULL` nie są rekonstruowane z aktualnej konfiguracji, ponieważ tworzyłoby to błąd look-ahead/configuration bias.
+- Celem kalibracji jest `is_profitable`, czyli dodatni wynik po kosztach, a nie przekroczenie arbitralnego progu `is_success`. Wyższy score nie może otrzymać niższego skalibrowanego prawdopodobieństwa niż niższy score.
+- Jakość prawdopodobieństw jest mierzona wyłącznie OOS przez Brier score, log loss, ECE, bias i wykres reliability. `passes_calibration_check` wymaga wystarczającej próby OOS oraz Brier score lepszego zarówno od surowego `confidence_score / 100`, jak i od stałej bazowej częstości z train.
+- Panel Web ma osobną kartę „Kalibracja Confidence”. `coverage_pct` pokazuje, jaka część wyników OOS ma użyteczny historyczny score i kwalifikujący się model; brak pokrycia nie jest zastępowany domyślnym prawdopodobieństwem.
+- Panel Web ma osobną kartę „Jakość danych” z bilansem rekordów wejściowych, dopuszczonych i wykluczonych, zestawieniem klas problemów oraz eksportem szczegółów. Sekcja `backtest_criteria.data_quality` w `config.yaml` steruje polityką audytu.
+- Confidence score moze sluzyc jednoczesnie do filtrowania sygnalow i do raportowania bucketow skutecznosci. Próg `0` oznacza brak filtra i zachowuje również historyczne rekordy z `confidence_score = NULL`; dodatni próg pomija rekordy bez wyniku. Surowych bucketów in-sample nie należy interpretować jako dowodu kalibracji.
 - Panel Web stylizuje maksymalnie 5000 pierwszych transakcji, aby duże backtesty nie przekraczały limitu Pandas Styler. Pełny zbiór pozostaje dostępny w eksporcie CSV.
 
 Pliki CSV po eksporcie backtestu:
@@ -1358,6 +1375,17 @@ Pliki CSV po eksporcie backtestu:
 - `backtest_results_walk_forward_confidence_validation.csv` - confidence buckety w kolejnych foldach
 - `backtest_results_walk_forward_module_confidence_validation.csv` - kombinacje moduł + bucket w kolejnych foldach
 - `backtest_results_walk_forward_selected_modules.csv` - zwycięzca train każdego horyzontu i folda wraz z późniejszym wynikiem OOS
+- `backtest_results_oos_calibration_predictions.csv` - każda prognoza holdout: surowy score, prawdopodobieństwo po kalibracji, wynik netto i użyty zakres modelu
+- `backtest_results_oos_calibration_metrics.csv` - Brier score, log loss, ECE, bias, pokrycie i werdykt kalibracji w holdoucie
+- `backtest_results_oos_calibration_reliability.csv` - prognozowana i zaobserwowana szansa zysku w przedziałach prawdopodobieństwa holdout
+- `backtest_results_oos_calibration_models.csv` - audyt modeli train, przyczyny odrzucenia i zapis mapowania izotonicznego
+- `backtest_results_walk_forward_calibration_predictions.csv` - prognozy confidence dla kolejnych foldów walk-forward
+- `backtest_results_walk_forward_calibration_metrics.csv` - metryki jakości prawdopodobieństw w każdym foldzie
+- `backtest_results_walk_forward_calibration_reliability.csv` - reliability dla foldów walk-forward
+- `backtest_results_walk_forward_calibration_models.csv` - modele train dopasowane niezależnie w każdym foldzie
+- `backtest_results_data_quality_overview.csv` - bilans rekordów wejściowych, dopuszczonych i wykluczonych oraz liczba problemów według poziomu
+- `backtest_results_data_quality_summary.csv` - zagregowane klasy problemów jakości, działania i liczba rekordów
+- `backtest_results_data_quality_issues.csv` - szczegółowy, nieinwazyjny ślad audytowy per rekord i powód wykluczenia
 - `backtest_results_source_ranking.csv` - ranking modeli, analityków i kont społecznościowych
 - `backtest_results_source_ranking_by_horizon.csv` - ranking źródeł osobno dla każdego horyzontu
 - `backtest_results_confidence_buckets.csv` - statystyki confidence bucketow lacznie dla wszystkich horyzontow
