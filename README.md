@@ -977,6 +977,8 @@ Obsługiwane pola zależne od modułu:
 - `fund_provider` — opcjonalne nadpisanie dostawcy danych fundamentalnych dla konkretnej spółki (`biznesradar`, `yahoo`, `stockanalysis`)
 - `biznesradar_id` — identyfikator spółki na portalu BiznesRadar (wymagany, jeśli różni się od tickera)
 
+Wszystkie interaktywne wejścia tickerów, ręczny zapis sygnałów i importy rekomendacji korzystają z jednego resolvera. Unikalny symbol bez rynku jest kanonizowany na podstawie konfiguracji, np. `XTB` → `XTB.PL`. Jeśli ten sam symbol albo alias pasuje do spółek na kilku rynkach, operacja jest zatrzymywana i komunikat pokazuje dostępne tickery wraz z nazwami spółek. Symbol spoza konfiguracji musi jawnie zawierać rynek (`.PL` albo `.US`). Przed przejściem do kolejnego kroku menu i ponownie przed zapisem system sprawdza tożsamość symbolu, typ `EQUITY`, zgodność rynku oraz dostępność ceny; ETF-y i inne instrumenty niebędące spółkami są odrzucane. Wyniki pozytywne i negatywne trafiają do tabeli SQLite `ticker_registry` na 30 dni. W tym okresie walidacja korzysta z rejestru bez ponownego wywołania Yahoo; błędy połączenia z dostawcą nie są zapisywane w cache'u. Cache identyfikacji instrumentu nie zastępuje osobnego pobrania aktualnej ceny sygnału.
+
 ## Konfiguracja analizatorów
 
 ### Fundamenty (FUND_OVERVIEW)
@@ -1124,7 +1126,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
 - `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
 - `--gap-backtest-export <CSV>` - eksportuje pojedyncze transakcje i MAE/MFE
-- `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`); wartość jest walidowana przed pobraniem ceny i zapisem
+- `--register-ticker <T>` - ticker do ręcznego zapisu sygnału (np. `CDR.PL`); centralny resolver waliduje składnię, alias, rynek i jednoznaczność przed pobraniem ceny oraz zapisem
 - `--register-signal <S>` - sygnał do zapisu (np. `BUY`, `SELL`, `HOLD`)
 - `--register-module <M>` - moduł źródłowy sygnału (domyślnie `REPORT_AI_DAILY_PICK`)
 - `--register-note <TXT>` - notatka opisująca kontekst decyzji
