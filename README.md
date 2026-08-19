@@ -739,9 +739,11 @@ Ticker z własnym `buy_alert_action` / `sell_alert_action` nadpisuje globalną w
 
 ### ALERT_RECOMMENDATIONS
 
-Pobiera i klasyfikuje rekomendacje analityczne z BiznesRadar.
+Pobiera i klasyfikuje rekomendacje analityczne z BiznesRadar dla GPW oraz Yahoo Finance/Benzinga dla spółek USA.
 
-**Dane:** BiznesRadar (cache 1h), cele cenowe
+**Dane:** BiznesRadar i Yahoo Finance/Benzinga (cache 1h), cele cenowe
+
+Źródła ustawia lista `modules.ALERT_RECOMMENDATIONS.sources`; obsługiwane wartości to `biznesradar` i `yahoo`. Dla Yahoo parametr `yahoo_lookback_days` określa ponownie sprawdzane okno historii (domyślnie 7 dni), co pozwala uzupełnić zdarzenia opublikowane podczas przerwy aplikacji. Polling Yahoo odbywa się tylko dla tickerów `.US`. Trwały `source_record_key` oraz kanoniczny fingerprint chronią przed powtórnym zapisem i alertem po restarcie procesu.
 
 Klasyfikacja rekomendacji:
 
@@ -751,7 +753,7 @@ Klasyfikacja rekomendacji:
 | 🔴 SELL | SPRZEDAJ, REDUKUJ, NIEDOWAŻAJ, SELL, UNDERWEIGHT |
 | 🟡 HOLD | Pozostałe |
 
-Każda pobrana rekomendacja jest zapisywana lub uzupełniana w kanonicznej tabeli `analyst_recommendations`. Alert Telegram jest wysyłany tylko dla nowej rekomendacji z dzisiaj lub wczoraj. Moduł nie tworzy już osobnego rekordu rekomendacji w `trade_signals`.
+Każda pobrana rekomendacja jest zapisywana lub uzupełniana w kanonicznej tabeli `analyst_recommendations`. Alert Telegram jest wysyłany tylko dla nowej rekomendacji z dzisiaj lub wczoraj. Dla Yahoo zawiera także instytucję, oryginalny rating i cenę docelową w USD. Moduł nie tworzy już osobnego rekordu rekomendacji w `trade_signals`.
 
 ---
 
@@ -848,6 +850,14 @@ rygorystycznie walidowany lokalnie przed utworzeniem sygnału.
 
 Udostępnia ręczny import i raportowanie rekomendacji analityków. Rekomendacje DM są zapisywane w `analyst_recommendations`; wskazania kont społecznościowych pozostają ogólnymi sygnałami w `trade_signals`.
 
+Rekomendacje Yahoo Finance/Benzinga dla aktywnych spółek z sekcji `tickers.US` można pobrać za wskazaną liczbę miesięcy poleceniem:
+
+```bash
+python src/import_yahoo_recommendations.py --months 12
+```
+
+Importer pomija indeksy, kontrakty i wyłączone symbole, mapuje ratingi do `BUY`/`HOLD`/`SELL`, pobiera cenę wejścia z ostatniego zamknięcia w dniu publikacji lub wcześniej oraz zachowuje instytucję, dokładny czas zdarzenia, poprzedni rating i zmianę ceny docelowej. Zdarzenia tego samego DM dla jednej spółki z tego samego dnia są scalane w jeden rekord, a komplet danych źródłowych pozostaje w notatce. Przed atomowym zapisem powstaje kopia `data/backups/stock_radar_before_yahoo_import_*.db`. Flaga `--dry-run` wykonuje pobranie i walidację bez zmiany bazy.
+
 - `source_type`: `analyst` albo `social_account`
 - `source_name`: nazwa analityka lub konta (wymagana)
 - `source_platform`: np. `X`, `YouTube`, `TV` albo `DM`
@@ -863,6 +873,8 @@ Nazwy instytucji są mapowane przez dwa słowniki w SQLite:
 
 - `analyst_institutions` — kanoniczne nazwy DM i innych instytucji analitycznych,
 - `analyst_institution_aliases` — możliwe warianty nazw powiązane przez `institution_id` z nazwą kanoniczną.
+
+Warianty `B of A Securities`, `Bank of America Securities`, `BofA`, `BofA Securities LLC` i `Bank of America Merrill Lynch` są normalizowane do `BofA Securities`.
 
 Podczas importu klucz aliasu jest niewrażliwy na wielkość liter, znaki diakrytyczne, interpunkcję i nadmiarowe spacje. Przykładowo `DM BOŚ`, `DM BOS`, `BOŚ DM`, `DM BOŚ SA` i `Dom Maklerski BOS` są zapisywane jako `DM BOŚ`. Warianty `DM Millennium`, `Millennium DM SA` i `Millennium Dom Maklerski` są scalane do `BM Banku Millennium`, `PKO BP DM` i `BM PKO BP SA` do `BM PKO BP`, `Erste Group Research`, `Erste BM`, `Erste Bank`, `Erste / East Value Research` i `Erste Securities Polska SA` do `Erste Securities`, a `DM Trigon` i `Trigon DM SA` do `Trigon DM`. Analogicznie normalizowane są sufiksy prawne używane przez Bankier/Notoria, np. `Noble Securities DM SA`, `East Value Research GmbH` i `Ipopema Securities SA`. Samodzielne `East Value Research` pozostaje odrębną instytucją badawczą. Nieznana instytucja jest automatycznie dodawana jako nowa nazwa kanoniczna wraz z aliasem własnym. To samo mapowanie jest stosowane podczas migracji danych historycznych i budowania rankingu. Inicjalizacja bazy automatycznie scala starsze instytucje zapisane pod aliasem, przepina ich rekomendacje i zachowuje połączone metadane źródłowe.
 
