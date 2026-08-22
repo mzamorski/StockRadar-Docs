@@ -1043,8 +1043,8 @@ confluence_criteria:
   layer1_min_score: 0.2
   composite_threshold: 0.2
   category_weights:
-    FUND: 0.35
-    MOMENTUM: 0.45
+    FUND: 0.55
+    MOMENTUM: 0.25
     TECH_ENTRY: 0.20
   conflict_penalty:
     enabled: true
@@ -1200,7 +1200,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
   Importer przyjmuje również format historii `recommendations[].recommendations_history[]` z polami `institution`, `recommendation`, `target_price`, `currency`, `report_date` i `horizon_months`. W tym formacie `institution` jest mapowane przez `analyst_institution_aliases` na kanoniczne `source_name`, a domyślne wartości to `source_type=analyst`, `source_platform=DM` i `recommendation_type=fundamental`. Dla `market=GPW` importer dodaje do tickera sufiks `.PL`. Jeżeli podano `report_date`, data sygnału odpowiada dacie raportu, a ceną wejścia jest ostatnie dostępne zamknięcie z tego dnia lub wcześniejszej sesji.
 - `--backtest-trade-signals` - uruchamia backtest na tabeli `trade_signals`
 - `--backtest-horizons <D1,D2,...>` - globalne horyzonty oceny w dniach, np. `1,7,30,90`; gdy parametr nie jest podany, backtest bierze `backtest_horizons` z konfiguracji modułu
-- `--backtest-dedup-days <D>` - okno deduplikacji sygnalow dla pary `(ticker, module, signal)`; domyslnie `7`, `0` wylacza deduplikacje
+- `--backtest-dedup-days <D>` - globalne nadpisanie okna deduplikacji sygnalow dla pary `(ticker, module, signal)`; bez flagi obowiazuje `modules.<NAZWA>.backtest_dedup_days`, `0` wylacza deduplikacje
 - `--backtest-success-threshold <P>` - prog sukcesu w procentach; transakcja jest liczona jako trafiona, gdy `net_directional_return_pct > P`; domyslnie `1.0`
 - `--backtest-min-confidence <C>` - filtruje backtest do sygnalow z `confidence_score >= C`; wartość `0` wyłącza filtr i obejmuje także rekordy bez `confidence_score`
 - `--backtest-transaction-cost-pct <P>` - łączny koszt wejścia, wyjścia i poślizgu odejmowany od każdej transakcji; domyślnie `0.2%`
@@ -1341,10 +1341,12 @@ ORDER BY recommendation_count DESC;
 
 Backtester czyta zwykłe sygnały z `trade_signals`, a dla modułu `REPORT_ANALYST_PICK` korzysta z kanonicznej tabeli `analyst_recommendations`.
 
+Aktualny raport referencyjny: [audyt skuteczności sygnałów z 2026-08-22](docs/signal-effectiveness-audit-2026-08-22.md).
+
 - Backtest domyslnie ocenia tylko moduly z `module_role: signal`; alerty i raporty sa pomijane.
 - Jezeli nie podasz `--backtest-horizons`, system bierze horyzonty z `modules.<NAZWA>.backtest_horizons`.
 - Domyslne horyzonty sa rozdzielone per typ modułu: fundamentalne maja zwykle `30,60,90,180`, a techniczne `1,7,14,30`.
-- Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
+- Deduplikacja działa w ruchomym oknie czasu dla tego samego `(ticker, module, signal, source_type, source_name)` i zostawia pierwszy sygnał danego źródła z okna. Bez globalnego nadpisania każdy moduł korzysta z `backtest_dedup_days`; wartość `0` przekazana przez CLI wyłącza deduplikację. Niezależni autorzy nie usuwają wzajemnie swoich wskazań.
 - Przed obliczeniami działa nieinwazyjny audyt jakości. Rekordy z nieprawidłowym tickerem, pustym modułem lub sygnałem, nieparsowalną albo przyszłą datą, niespójną datą/czasem albo bez jednoznacznego kierunku są domyślnie wykluczane z próby, lecz pozostają bez zmian w bazie wraz z powodem widocznym w raporcie.
 - Neutralne `HOLD`, `WAIT`, `NEUTRAL` i nieznane nazwy sygnałów nie są automatycznie uznawane za pozycje long. Kierunek jest przypisywany wyłącznie przez jawne mapowanie kanonicznych sygnałów long/short.
 - Brak historycznego `confidence_score`, atrybucji źródła albo ceny zapisanej przy sygnale jest raportowany, ale nie unieważnia transakcji. Brak ceny zapisanej nie przeszkadza domyślnemu wejściu po cenie zamknięcia następnej sesji; brak confidence ogranicza jedynie pokrycie kalibracji.
