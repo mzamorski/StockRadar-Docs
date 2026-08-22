@@ -560,9 +560,10 @@ Aktualna logika działa warstwowo (2-layer scoring), zamiast prostego liczenia l
 1. Warstwa 1 (decyzja TAK/NIE): kategorie fundamentalne, np. Piotroski / PEAD / FUND_OVERVIEW.
 2. Warstwa 2 (timing): momentum i wejście techniczne, np. RS / ADX / Bollinger / Support Bounce.
 
-Sygnał końcowy jest liczony jako ważona kompozycja kategorii (domyślnie FUND 35%, MOMENTUM 45%, TECH_ENTRY 20%).
+Sygnał końcowy jest liczony jako ważona kompozycja kategorii (domyślnie FUND 55%, MOMENTUM 25%, TECH_ENTRY 20%).
 Warstwa 1 pełni rolę bramki: jeśli FUND nie potwierdza kierunku, sygnał jest blokowany.
 Dodatkowo działa kara konfliktu (value-trap guard): gdy FUND jest dodatni, ale MOMENTUM wyraźnie ujemne, composite jest obniżany.
+Zwykły sygnał wymaga co najmniej dwóch skategoryzowanych modułów z dwóch kategorii, przy czym MOMENTUM lub TECH_ENTRY musi potwierdzać finalny kierunek. `STRONG_*` wymaga co najmniej trzech modułów z dwóch kategorii. Dzięki temu pojedynczy FUND ani FUND skonfliktowany z całą warstwą techniczną nie jest traktowany jako konfluencja.
 
 **Dane:** tabela `trade_signals` w SQLite (ostatnie N dni)
 
@@ -574,9 +575,9 @@ Dzięki temu `META_CONFLUENCE` może połączyć np. sygnał `BUY` z modułu fun
 
 | Sygnał | Warunki |
 |--------|--------|
-| 🟢🟢 STRONG BULLISH | Composite bullish, mocny wynik i brak istotnej kontrstrony |
+| 🟢🟢 STRONG BULLISH | Composite bullish, mocny wynik, brak kontrstrony, minimum 3 moduły i 2 kategorie |
 | 🟢 BULLISH | Composite bullish, przekroczony próg |
-| 🔴🔴 STRONG BEARISH | Composite bearish, mocny wynik i brak istotnej kontrstrony |
+| 🔴🔴 STRONG BEARISH | Composite bearish, mocny wynik, brak kontrstrony, minimum 3 moduły i 2 kategorie |
 | 🔴 BEARISH | Composite bearish, przekroczony próg |
 | ⚪ BRAK SYGNAŁU | Wynik poniżej progu lub blokada przez Layer 1 |
 
@@ -584,7 +585,7 @@ Klasyfikacja sygnałów:
 - **Bycze:** BUY, STRONG BUY, STRONG (Piotroski), OUTPERFORM (RS), POSITIVE_DRIFT (PEAD), STRONG_UP (ADX)
 - **Niedźwiedzie:** SELL, WEAK (Piotroski), UNDERPERFORM (RS), NEGATIVE_DRIFT (PEAD), STRONG_DOWN (ADX)
 
-Konfiguracja (nowa): `confluence_criteria.lookback_days`, `module_weights`, `module_category_map`, `category_weights`, `layer1_categories`, `layer1_min_score`, `composite_threshold`, `conflict_penalty`.
+Konfiguracja: `confluence_criteria.lookback_days`, `module_weights`, `module_category_map`, `category_weights`, `layer1_categories`, `layer1_min_score`, `composite_threshold`, `layered_min_modules`, `layered_min_categories`, `strong_min_modules`, `strong_min_categories`, `conflict_penalty` i `market_regime_filter`.
 
 Fallback: jeśli nie zdefiniujesz mapowania kategorii (`module_category_map` + `category_weights`), moduł przechodzi do starszego trybu sumowania wag (`min_signals`).
 
@@ -593,7 +594,10 @@ Fallback: jeśli nie zdefiniujesz mapowania kategorii (`module_category_map` + `
 - `🟢 BULLISH` / `🟢🟢 STRONG_BULLISH` = praktyczny odpowiednik kierunku BUY po agregacji sygnałów (nie jest to literalny sygnał `BUY`, tylko sygnał meta).
 - `🔴 BEARISH` / `🔴🔴 STRONG_BEARISH` = praktyczny odpowiednik kierunku SELL/AVOID po agregacji.
 - `⚪ BELOW THRESHOLD` = composite nie przekroczył `composite_threshold`; traktuj jako brak przewagi (`NO-TRADE`).
+- `🚫 COVERAGE GATE` = kandydat nie ma wymaganej liczby niezależnych modułów lub kategorii.
+- `🚫 DIRECTION GATE` = żadna kategoria Layer 2 nie potwierdza finalnego kierunku composite.
 - `🚫 L1 GATE` = warstwa FUND (Layer 1) zablokowała sygnał mimo wskazań warstwy technicznej.
+- `🚫 REGIME` = kierunek sygnału jest przeciwny do trendu szerokiego rynku albo long został zablokowany przez wysoki VIX.
 - `⚠️ CONFLICT PENALTY` = aktywna kara konfliktu FUND vs MOMENTUM obniżyła composite.
 
 Przykład:
@@ -603,12 +607,15 @@ Przykład:
 
 Kolejność decyzji w modelu warstwowym:
 
-1. Najpierw sprawdzana jest warstwa `FUND` (L1, bramka go/no-go).
-2. Dopiero potem `MOMENTUM` + `TECH_ENTRY` budują finalny kierunek i siłę sygnału.
+1. Sprawdzane jest minimalne pokrycie modułów i kategorii.
+2. FUND, MOMENTUM i TECH_ENTRY budują composite z uwzględnieniem kary konfliktu.
+3. Warstwa `FUND` działa jako bramka kierunku go/no-go.
+4. Filtr reżimu blokuje long w bessie oraz short w hossie.
+5. `abs(composite)` zasila `signal_strength`, więc confidence rośnie wraz z rzeczywistą siłą zbieżności.
 
 #### Tagi setupów (Setup Tags)
 
-Gdy META_CONFLUENCE emituje sygnał byczży, automatycznie rozpoznaje jedną z czterech nazwanych konfiguracji wysokiej jakości i dołącza tag do logu konsoli, wiadomości Telegram oraz pola `signal_params` w bazie danych (umożliwia filtrowanie w backtestach).
+Gdy META_CONFLUENCE emituje sygnał byczy, automatycznie rozpoznaje jedną z czterech nazwanych konfiguracji wysokiej jakości i dołącza tag do logu konsoli, wiadomości Telegram oraz pola `signal_params` w bazie danych (umożliwia filtrowanie w backtestach).
 
 | Tag | Warunki | Charakterystyka |
 |-----|---------|----------------|
@@ -1042,6 +1049,12 @@ confluence_criteria:
   layer1_categories: [FUND]
   layer1_min_score: 0.2
   composite_threshold: 0.2
+  layered_min_modules: 2
+  layered_min_categories: 2
+  require_layer2_confirmation: true
+  strong_min_modules: 3
+  strong_min_categories: 2
+  scoring_version: "layered-v3"
   category_weights:
     FUND: 0.55
     MOMENTUM: 0.25
@@ -1050,6 +1063,12 @@ confluence_criteria:
     enabled: true
     momentum_negative_threshold: -0.3
     penalty: 0.4
+  market_regime_filter:
+    enabled: true
+    pl_benchmark: "ETFBW20TR.WA"
+    us_benchmark: "^GSPC"
+    block_bullish_in_bear_market: true
+    block_bearish_in_bull_market: true
 ```
 
 ## Sesja i deduplikacja
@@ -1363,7 +1382,7 @@ Aktualny raport referencyjny: [audyt skuteczności sygnałów z 2026-08-22](docs
 - Podział jest purged: transakcja rozpoczęta w train trafia do statystyk treningowych tylko wtedy, gdy jej `exit_date` przypada przed początkiem OOS. Wyniki, które nie były jeszcze znane, są raportowane jako `purged_outcomes` i usuwane z train.
 - Anchored walk-forward zaczyna się domyślnie po 90 dniach historii i ocenia kolejne pełne, niepokrywające się okna po 30 dni. Niepełne końcowe okno nie jest raportowane.
 - Dodatni wynik OOS jest testowany jednostronnie, a wartości p są korygowane metodą Benjamini-Hochberga osobno w każdej rodzinie horyzont/fold. `passes_oos_net_fdr` oznacza, że wynik netto przetrwał ustawiony limit FDR; brak flagi oznacza wynik niepotwierdzony, a nie automatycznie stratny.
-- Dla tickerów GPW benchmarkiem jest `WIG20.WA`, a dla USA `^GSPC`. `excess_return_pct` porównuje zwrot kierunkowy pozycji ze zwrotem benchmarku w tym samym kierunku i okresie. Przy jednakowym koszcie round-trip koszt odejmuje się po obu stronach i nie zmienia alfy.
+- Dla tickerów GPW benchmarkiem jest `ETFBW20TR.WA` (płynne proxy indeksu WIG20TR z pełną historią Yahoo), a dla USA `^GSPC`. `excess_return_pct` porównuje zwrot kierunkowy pozycji ze zwrotem benchmarku w tym samym kierunku i okresie. Dopasowanie sesji jest ograniczone do 7 dni, więc odległa obserwacja nie może udawać ceny benchmarku. Przy jednakowym koszcie round-trip koszt odejmuje się po obu stronach i nie zmienia alfy.
 - Panel Web ma osobną kartę „Out-of-sample” z pełnym holdoutem, modułami wybranymi na train, foldami walk-forward, alfą oraz FDR. Confidence buckety są weryfikowane OOS niezależnie od rankingu in-sample.
 - Kalibrator confidence jest dopasowywany oddzielnie w każdym podziale i horyzoncie metodą regresji izotonicznej PAVA. Preferuje model `module_horizon`; gdy próba modułu jest zbyt mała, może użyć oznaczonego `horizon_fallback`. Model nie powstaje przy zbyt małej próbie, zbyt małej liczbie różnych score albo tylko jednej klasie wyników.
 - Nowe sygnały `REPORT_AI_DAILY_PICK` zapisują indywidualny confidence konkretnego wyboru jako `confidence_score`, dzięki czemu przyszła próba zawiera zmienność potrzebną do kalibracji. Historyczne `NULL` nie są rekonstruowane z aktualnej konfiguracji, ponieważ tworzyłoby to błąd look-ahead/configuration bias.
