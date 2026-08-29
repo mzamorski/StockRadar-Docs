@@ -22,6 +22,7 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | Moduł | Kategoria | Sygnały |
 |-------|-----------|---------|
 | `TECH_INDICATORS` | Techniczna | STRONG BUY / BUY / SELL / WAIT |
+| `EVENT_INDEX_REVISION` | Zdarzeniowa (spekulacyjna) | BUY (awans) / SELL (spadek) |
 | `TECH_VOLUME` | Techniczna | BUY (BULLISH) / SELL (BEARISH) / WAIT |
 | `TECH_CANDLESTICK` | Techniczna | BUY / SELL / WAIT |
 | `TECH_GAPS` | Techniczna | GAP UP / GAP DOWN / FILLED |
@@ -423,6 +424,81 @@ Jeśli WIG rośnie, ale `% Above SMA50` spada — tylko największe spółki ci�
 Wysyłany raz na cykl (deduplikacja przez `state_value = "{pct_above_50}|{ad_ratio}"`).
 
 ---
+
+### EVENT_INDEX_REVISION
+
+Moduł zdarzeniowy prognozuje okresowe zmiany składu `WIG20` i `mWIG40`.
+Jest to dodatkowy sygnał spekulacyjny i celowo nie wchodzi do
+`META_CONFLUENCE`.
+
+Ranking jest liczony dla pełnego, kwalifikowanego uniwersum według wzoru
+`R = 0.6 * udział kapitalizacji free-float + 0.4 * udział obrotu za 12 miesięcy`.
+Następnie stosowane są bufory rewizji rocznej albo kwartalnej oraz limit pięciu
+spółek z jednego sektora w `WIG20`.
+
+| Zmiana | Sygnał | Etap | Bazowy `confidence_score` |
+|--------|--------|------|---------------------------|
+| Awans do wyższego indeksu | `BUY` | `PROBABLE` | 70 lub 85 w paśmie automatycznym |
+| Spadek do niższego indeksu albo poza śledzone indeksy | `SELL` | `PROBABLE` | 70 lub 85 w paśmie automatycznym |
+| Oficjalnie ogłoszona zmiana | zgodnie z kierunkiem | `CONFIRMED` | 95 |
+
+Moduł automatycznie tworzy i codziennie odświeża plik CSV wskazany przez
+`index_revision_criteria.snapshot_path` (domyślnie `data/index_ranking.csv`).
+Generator korzysta z oficjalnego kalendarza i składów GPW Benchmark oraz
+mapowania ISIN, sektorów i notowań Yahoo. Można go też uruchomić ręcznie:
+
+```powershell
+python src/generate_index_ranking.py
+```
+
+Domyślnie historia rynkowa jest pobierana tylko dla 60 spółek z WIG20 i
+mWIG40. To wystarcza do prognozowania rotacji WIG20 oraz do obsługi oficjalnie
+ogłoszonych awansów i spadków obu indeksów. Pełna, przedkomunikatowa prognoza
+wejść do mWIG40 wymaga kandydatów z sWIG80:
+
+```powershell
+python src/generate_index_ranking.py --include-swig80-candidates
+```
+
+Każdy wiersz opisuje jedną spółkę, a daty rewizji są powtarzane w całym pliku.
+
+Wymagane kolumny danych:
+
+- `ticker`, `current_index`, `free_float_cap`, `turnover_12m`;
+- `sector`, `eligible`, `mwo_eligible`;
+- `as_of_date`, `ranking_date`, `announcement_date`, `effective_date`,
+  `revision_type`.
+
+Opcjonalne kolumny to `last_price` oraz `official_target_index`. Druga z nich
+nadpisuje prognozę i oznacza zdarzenie jako `CONFIRMED`. Przykładowy format
+znajduje się w `docs/index-ranking-snapshot.example.csv`.
+
+Zabezpieczenia modułu:
+
+- brak sygnału dla brakującego, nieaktualnego albo niepełnego snapshotu;
+- domyślne minimum to 60 spółek z WIG20 i mWIG40;
+- brak sygnału poza skonfigurowanym oknem rewizji;
+- zapis snapshotu jest atomowy, a niepełne dane nie zastępują poprawnego pliku;
+- `free_float_cap` i obrót są przybliżeniem rankingu GPW Benchmark, więc sygnał
+  przed oficjalnym komunikatem pozostaje spekulacyjny.
+
+Konfiguracja:
+
+```yaml
+modules:
+  EVENT_INDEX_REVISION:
+    enabled: true
+    analysis_scope: market
+
+index_revision_criteria:
+  snapshot_path: data/index_ranking.csv
+  auto_refresh_snapshot: true
+  minimum_universe_size: 60
+  include_swig80_candidates: false
+  max_snapshot_age_days: 14
+  pre_ranking_window_days: 56
+  post_effective_window_days: 3
+```
 
 ### FUND_OVERVIEW
 
