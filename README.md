@@ -732,11 +732,13 @@ WHERE module = 'META_CONFLUENCE'
 Hybrydowy moduł decyzyjny AI. Nie liczy wskaźników od zera.
 
 Zamiast tego:
-1. Pobiera najnowsze sygnały modułowe z tabeli `trade_signals` (z ostatnich N dni).
-2. Buduje ustrukturyzowany prompt z twardymi wejściami (moduł, sygnał, confidence, timestamp).
-3. Prosi model AI o finalny werdykt w formacie JSON: `STRONG_BUY | BUY | HOLD | SELL`.
+1. Pobiera najnowszy sygnał każdego modułu źródłowego z tabeli `trade_signals` (z ostatnich N dni).
+2. Pomija `META_AI_VERDICT` i `META_CONFLUENCE`, aby zapobiec pętli oraz podwójnemu liczeniu tych samych przesłanek.
+3. Buduje ustrukturyzowany prompt z twardymi wejściami: moduł, sygnał, confidence, timestamp oraz ograniczony zestaw istotnych pól `signal_params`.
+4. Tworzy fingerprint semantycznego wejścia. W tym samym dniu nie odpytuje ponownie AI, jeśli zmienił się wyłącznie timestamp, a sygnały i ich szczegóły pozostały takie same.
+5. Prosi model AI o finalny werdykt w formacie JSON: `STRONG_BUY | BUY | HOLD | SELL`.
 
-**Ważne:** `META_AI_VERDICT` jest celowo wykluczony z wejścia `META_CONFLUENCE`, żeby uniknąć pętli zwrotnej (AI -> confluence -> AI).
+**Ważne:** oba meta-moduły są wzajemnie wykluczone ze swoich wejść. Dzięki temu AI ocenia pierwotne sygnały, a nie wynik wcześniejszej agregacji tych samych danych.
 
 | Werdykt | Zachowanie |
 |--------|------------|
@@ -745,7 +747,7 @@ Zamiast tego:
 | `SELL` | zapis jako trade signal (`SELL`) |
 | `HOLD` | alert informacyjny (bez zapisu trade signal) |
 
-Konfiguracja: `ai_verdict_criteria` (`lookback_days`, `max_signals`, `min_signals`, `model_name`, `temperature`, `top_p`, `prompt_template`).
+Konfiguracja: `ai_verdict_criteria` (`lookback_days`, `max_signals`, `min_signals`, `model_name`, `temperature`, `top_p`, `skip_unchanged_inputs`, `prompt_template`). Domyślnie moduł korzysta z darmowego `gemini-3.5-flash-lite` bez wyszukiwania internetowego.
 
 ---
 
