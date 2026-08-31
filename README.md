@@ -1679,7 +1679,46 @@ Sekcje opcjonalne (zalecane):
 - KNF dla krotkiej sprzedazy
 - BiznesRadar dla rekomendacji analitycznych
 - Yahoo Finance dla danych rynkowych i czesci danych fundamentalnych
+- publiczny, opóźniony option chain Nasdaq z fallbackiem Yahoo dla Gamma/GEX
 - Google Gemini dla funkcji AI
+
+## Gamma / GEX (rynek opcji USA)
+
+Portal zawiera osobny panel `Gamma / GEX` dla płynnych instrumentów USA. Domyślny
+provider `custom` pobiera bez klucza opóźniony option chain używany przez publiczną
+stronę Nasdaq. Ponieważ endpoint strony nie jest oficjalnym, wersjonowanym API,
+awaria lub zmiana jego formatu automatycznie przełącza pobieranie na Yahoo Finance.
+Nasdaq nie zwraca IV w tabeli, dlatego silnik wyznacza ją lokalnie z ceny mid/last
+metodą Black-Scholes. Wynik jest jawnie prezentowany jako `Estimated Dealer GEX`,
+a nie obserwowana pozycja animatorów rynku. Silnik oblicza:
+
+- Dollar GEX na ruch instrumentu bazowego o 1%, per strike i per expiry,
+- Net GEX, 0DTE GEX i udział 0DTE,
+- estymowane Call Wall i Put Wall wraz z siłą poziomu,
+- Gamma Flip przez symulację ceny bazowej i bisekcję,
+- reżim `PositiveGamma`, `NegativeGamma` albo `NearGammaFlip`.
+
+Każdy snapshot zawiera również automatyczny blok „Wniosek dla laika”. Pokazuje on
+prostym językiem bieżące ryzyko, warunek potwierdzenia scenariusza wzrostowego i
+spadkowego, kolejne strefy oraz osobną uwagę dla inwestora długoterminowego. Wniosek
+jest deterministyczny i nie korzysta z modelu AI ani nie generuje rekomendacji BUY/SELL.
+
+Snapshoty są zapisywane do `data/gamma_snapshots.db`. Cache ma osobny TTL dla
+otwartej i zamkniętej sesji USA. Konfiguracja znajduje się w sekcji `gamma` pliku
+`config.yaml`; multiplier jest ustawiany per instrument. Adapter vendora jest
+neutralny względem dostawcy i pozostaje wyłączony do czasu ustawienia
+`gamma.vendor.url_template`, zmiennej z tokenem oraz `enabled: true`. Odpowiedź
+vendora musi zawierać jawny timestamp, a jej hash i oryginalne nazwy metryk trafiają
+do metadanych snapshotu.
+
+Quant Data nie jest darmowym źródłem API: wymaga osobnej aktywnej subskrypcji API,
+klucza Bearer i podpisanej umowy OPRA. Z tego powodu nie jest włączone w domyślnej,
+bezpłatnej konfiguracji. OptionCharts może służyć jako zewnętrzny widok porównawczy,
+ale nie udostępnia udokumentowanego publicznego API, a część widoków i danych może
+wymagać płatnego planu.
+
+Wartości Gamma/GEX są kontekstem zmienności i koncentracji opcji. Nie są sygnałem
+BUY/SELL ani gwarantowanym wsparciem lub oporem.
 
 ## Disclaimer
 
