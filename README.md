@@ -49,6 +49,7 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | `REPORT_AI_DAILY_PICK` | Raport (AI) | pick dnia |
 | `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
 | `REPORT_MORNING_BRIEF` | Raport | informacyjny |
+| `REPORT_MARKET_ACTIVITY` | Raport rynkowy | TOP N wg obrotu / wolumenu / RVOL |
 
 ### Klasyfikacja mechanizmu generowania sygnałów
 
@@ -1009,6 +1010,48 @@ Wyłącznie informacyjny — bez sygnałów transakcyjnych.
 
 ---
 
+### REPORT_MARKET_ACTIVITY
+
+Generuje cykliczny ranking najaktywniejszych spółek podczas sesji. Domyślnie
+obejmuje włączone tickery GPW i USA z `config.yaml`, publikuje osobne TOP 10 co
+60 minut i pomija zamknięte rynki, zapisując informację o pominięciu w konsoli.
+
+Ranking może być sortowany według:
+
+- `turnover` — skumulowana wartość obrotu (`Close × Volume`),
+- `volume` — skumulowany wolumen,
+- `relative_volume` — wolumen względem średniego wolumenu poprzednich sesji
+  po tej samej liczbie świec intraday.
+
+Konfiguracja:
+
+```yaml
+modules:
+  REPORT_MARKET_ACTIVITY:
+    enabled: true
+    notify: true
+    log_console: true
+    module_role: report
+    analysis_scope: market
+    interval_minutes: 60
+    active_hours: ["09:00-22:00"]
+
+market_activity:
+  markets: [PL, US]
+  top_n: 10
+  ranking_metric: turnover
+  data_interval: 5m
+  include_relative_volume: true
+  min_turnover: 100000
+  only_open_markets: true
+```
+
+Obsługiwane rynki to `PL` i `US`. Dane są pobierane zbiorczo z Yahoo Finance.
+Raport jest informacyjny i nie zapisuje sygnałów transakcyjnych. Interwał
+schedulera jest liczony od czasu uruchomienia modułu, a nie od pełnej godziny.
+
+---
+
 
 
 ## Harmonogram modułów
@@ -1018,12 +1061,13 @@ Scheduler działa per moduł. Każdy moduł ma osobne:
 - `interval_minutes`
 - `active_hours`
 
-Konfiguracja znajduje się w sekcji `module_schedules` w `config.yaml`.
+Konfiguracja znajduje się bezpośrednio przy module w sekcji `modules` w
+`config.yaml`. Aplikacja tworzy z niej wewnętrzny widok `module_schedules`.
 
 Przykład:
 
 ```yaml
-module_schedules:
+modules:
   ALERT_ESPI:
     interval_minutes: 1
     active_hours: ["00:00-23:59"]
@@ -1037,8 +1081,8 @@ module_schedules:
 
 Uwagi:
 
-- `module_schedules` jest wymagane
-- każdy moduł z `active_modules` musi mieć własny wpis w `module_schedules`
+- sekcja `modules` jest wymagana
+- każdy element `AnalysisModule` musi mieć własny wpis w `modules`
 - `active_hours` może być pojedynczym oknem lub listą okien
 - `run()` i `--schedule` respektują okna czasowe modułów
 
@@ -1343,6 +1387,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `REPORT_AI_DAILY_PICK`
 - `REPORT_AI_RECOMMENDATIONS`
 - `REPORT_ANALYST_PICK`
+- `REPORT_MARKET_ACTIVITY`
 - `ALERT_PRICE_CHANGE`
 - `ALERT_PRICE_LEVEL`
 - `FEED_CALENDAR`
@@ -1366,7 +1411,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `TECH_SUPPORT_BOUNCE`
 - `TECH_VOLUME`
 
-Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
+Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MARKET_ACTIVITY`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
 
 ## Przyklady CLI
 
