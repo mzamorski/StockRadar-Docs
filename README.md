@@ -351,6 +351,27 @@ Konfiguracja: `relative_strength_criteria.lookback_months`, `outperform_pct`, `u
 
 ---
 
+### TECH_MARKET_RANKING
+
+Wykrywa i ocenia zbiorczą kondycję techniczną spółki w skali **0–100 pkt** na podstawie około roku świec dziennych Yahoo Finance.
+
+**Wskaźniki:** SMA20, SMA50, SMA200, Momentum (5D, 20D, 60D), dystans do 52W High, relatywny wolumen, luka otwarcia %, ATR14 %.
+
+**Struktura punktacji (Max 100 pkt):**
+- **Trend (40 pkt):** Close > SMA20 (+10), Close > SMA50 (+12), Close > SMA200 (+13 lub +6.5 gdy brak 200 świec), SMA20 > SMA50 (+5)
+- **Momentum (35 pkt):** 5D [-5%..8%] → 0..8 pkt, 20D [-12%..20%] → 0..14 pkt, 60D [-20%..35%] → 0..13 pkt
+- **Proximity do 52W High (15 pkt):** dystans [-35%..0%] → 0..15 pkt
+- **Wolumen (10 pkt):** relatywny wolumen [0.5..2.0x] → 0..10 pkt
+
+| Sygnał | Wynik (Score) |
+|--------|--------------|
+| 🟢 STRONG BUY | Score ≥ 85 |
+| 🟢 BUY | Score ≥ 75 |
+| ⚪ HOLD | 30 < Score < 75 |
+| 🔴 SELL | Score ≤ 30 |
+
+---
+
 ### TECH_PIVOT
 
 Zaawansowana analiza techniczna punktów odniesienia (Pivot Points), VWAP, struktury rynku i setupów płynności.
