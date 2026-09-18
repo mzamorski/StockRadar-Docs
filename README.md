@@ -1287,6 +1287,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - Gdy `startup_diagnostics: true` w `config.yaml`, każdy właściwy przebieg aplikacji bez `--silent` wysyła do konsoli i Telegrama diagnostykę procesu: czas, host, użytkownika, PID, interpreter, pełną komendę oraz dane dwóch poziomów procesów nadrzędnych. Wywołania `--help` i `--menu` nie wysyłają diagnostyki. Po zakończeniu śledztwa ustaw `startup_diagnostics: false`. Ułatwia to ustalenie, czy aplikację uruchomił terminal, plik BAT, launcher Pythona czy Harmonogram zadań Windows.
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
 - `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
+- `--add-ticker <TICKER>` - weryfikuje instrument przez centralny resolver/Yahoo i trwale dopisuje spółkę do `config.yaml`; nowy ticker musi zawierać rynek, np. `NVDA.US` albo `XTB.PL`. Operacja jest idempotentna: ticker już obecny w konfiguracji kończy się sukcesem bez duplikatu. ETF-y, błędny rynek i symbole bez dostępnych notowań są odrzucane. Zapis zachowuje komentarze/formatowanie YAML i jest wykonywany atomowo.
 - `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US` lub `*.US` dla calego rynku); moduły z `analysis_scope: market` są wtedy pomijane, chyba że zostaną jawnie wskazane przez `--modules`
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
@@ -1448,6 +1449,9 @@ python src/stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT
 
 # analiza calego rynku amerykanskiego i dodatkowo wybranej spolki z PL
 python src/stock_radar.py --tickers *.US,CDR.PL
+
+# trwałe dodanie zweryfikowanej spółki do config.yaml; dobre API do wywołania np. z XtbTools
+python src/stock_radar.py --add-ticker NVDA.US
 
 # backfill luk cenowych dla 6 miesiecy wraz ze statystykami domknięć per spółka
 python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
