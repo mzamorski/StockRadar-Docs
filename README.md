@@ -227,10 +227,39 @@ techniczne. Luki wzrostowe pozostają w historii luk, ale przy `long_only: true`
 nie tworzą transakcyjnego sygnału `SELL`.
 
 Dedykowany backtest gap-fill zakłada wejście po cenie otwarcia luki, brak
-stop-lossa i maksymalnie sześć miesięcy kalendarzowych na domknięcie. Uwzględnia
-koszty transakcyjne oraz MAE/MFE. Luki bez pełnego sześciomiesięcznego okresu
-obserwacji są oznaczane jako ocenzurowane i nie trafiają do mianownika
-statystyki domknięć.
+stop-lossa i maksymalnie sześć miesięcy kalendarzowych na domknięcie. Może
+oceniać osobno `GAP DOWN` jako pozycję `BUY`, `GAP UP` jako pozycję
+`SELL`/short albo oba kierunki jednocześnie. W trybie obu kierunków tabela
+pokazuje dodatkowo osobne wiersze `TOTAL DOWN` i `TOTAL UP`, dzięki czemu
+wynik long i short nie ginie w jednej średniej. Menu domyślnie proponuje oba
+kierunki; bez jawnego wyboru CLI zachowuje kompatybilny tryb `down` z
+`gap_strategy.direction_mode`. Backtest obejmuje wyłącznie akcje `.PL` i
+`.US`, dla których StockRadar ma zdefiniowane godziny otwarcia sesji.
+Uwzględnia koszty transakcyjne oraz MAE/MFE. Luki bez pełnego
+sześciomiesięcznego okresu obserwacji są oznaczane jako ocenzurowane i nie
+trafiają do mianownika statystyki domknięć.
+
+Ta zmiana dotyczy backtestu. Bieżący zapis sygnałów `TECH_GAPS` pozostaje
+long-only dla `GAP DOWN`, dopóki konfiguracja/strategia sygnałów live nie
+zostanie osobno rozszerzona o short.
+
+Dla pojedynczej spółki dostępny jest również profil wielohoryzontowy. Menu
+**Profil domykania luk dla spółki** pobiera historię H1 raz, analizuje oba
+kierunki i automatycznie liczy statystyki dla horyzontów 1, 3, 5, 10, 20, 60, 120,
+180 i 365 dni kalendarzowych. Tabela pokazuje osobno dla `GAP DOWN → BUY` i `GAP UP → SELL`:
+liczbę luk, próbę dojrzałą, liczbę domknięć, fill rate, średni i medianowy czas
+do domknięcia, średnią liczbę świec H1, średni wynik netto i profit factor.
+Średni/medianowy czas domknięcia jest liczony tylko dla luk faktycznie
+domkniętych. Pod tabelą pojawia się również deterministyczne **Podsumowanie
+statystyczne**: wskazuje horyzonty, przy których historyczny fill rate przekracza
+50%, 75% i 90%, typowy czas domknięcia, ewentualne plateau skuteczności przy
+dalszym wydłużaniu czasu oczekiwania oraz asymetrię między GAP DOWN i GAP UP.
+Podsumowanie nie formułuje mocnego wniosku, jeśli dojrzała próba jest zbyt mała.
+Minimalną próbę i próg plateau kontrolują odpowiednio
+`gap_strategy.profile_summary_min_sample` oraz
+`gap_strategy.profile_summary_plateau_gain_pct`. Horyzonty i długość historii
+można zmienić w `gap_strategy.profile_horizons_days` oraz
+`gap_strategy.profile_period`.
 
 ---
 
@@ -1333,6 +1362,9 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--gap-list-status <STATUS>` - filtr tabeli luk: `unfilled` (domyślnie), `filled` albo `all`
 - `--backtest-gap-fill` - uruchamia dedykowany backtest strategii domykania luk
 - `--gap-backtest-period <PERIOD>` - okres danych H1, np. `1y`, `2y`; domyślnie `2y`
+- `--gap-direction <MODE>` - kierunek strategii: `down` = GAP DOWN/long, `up` = GAP UP/short, `both` = oba kierunki
+- `--gap-profile-ticker <TICKER>` - wielohoryzontowy profil domykania luk dla jednej spółki; analizuje UP/DOWN osobno
+- `--gap-profile-export <CSV>` - eksportuje tabelę profilu spółki do CSV
 - `--gap-min-pct <PCT>` - nadpisuje minimalną wielkość luki
 - `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
 - `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
