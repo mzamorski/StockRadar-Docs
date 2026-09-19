@@ -1358,7 +1358,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
 - `--backfill-gap-signals` - idempotentnie zapisuje historyczne luki sesyjne `DOWN` jako `TECH_GAPS / BUY` w `trade_signals`
-- `--list-price-gaps <TICKER>` - wyświetla tabelę luk zapisanych dla spółki
+- `--list-price-gaps <TICKER>` - przed wyświetleniem wymusza świeże pobranie H1 z Yahoo (bez 60-sekundowego cache), przelicza luki i status ich domknięcia dla okresu `gap_strategy.list_refresh_period`, zapisuje wynik do SQLite i dopiero potem wyświetla tabelę
 - `--gap-list-status <STATUS>` - filtr tabeli luk: `unfilled` (domyślnie), `filled` albo `all`
 - `--backtest-gap-fill` - uruchamia dedykowany backtest strategii domykania luk
 - `--gap-backtest-period <PERIOD>` - okres danych H1, np. `1y`, `2y`; domyślnie `2y`
