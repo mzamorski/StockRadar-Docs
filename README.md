@@ -1126,7 +1126,24 @@ tickers:
       fund_provider: "biznesradar"
       biznesradar_id: "CD-PROJEKT"
       priority: "high"
+  FX:
+    AUDJPY:
+      display_name: "AUD/JPY"
+      keywords: ["AUD/JPY", "AUDJPY"]
+  CMD:
+    XAUUSD:
+      display_name: "Gold"
+      # dla znanych surowców StockRadar ma wbudowane mapowanie Yahoo;
+      # dla własnego symbolu można podać np. yahoo_symbol: "CC=F"
 ```
+
+Kanoniczny suffix określa klasę instrumentu: `.PL` i `.US` oznaczają akcje,
+`.FX` pary walutowe, a `.CMD` surowce. StockRadar zachowuje te identyfikatory
+w bazie (np. `AUDJPY.FX`, `XAUUSD.CMD`) i osobno tłumaczy je na symbol
+dostawcy danych. Dla Yahoo pary FX używają formatu `AUDJPY=X`; standardowe
+surowce są mapowane na płynne kontrakty futures, np. `XAUUSD.CMD -> GC=F`
+i `WTIUSD.CMD -> CL=F`. Pole `yahoo_symbol` pozwala jawnie nadpisać mapowanie
+dla kolejnych surowców.
 
 Obsługiwane pola zależne od modułu:
 
@@ -1141,7 +1158,9 @@ Obsługiwane pola zależne od modułu:
 - `fund_provider` — opcjonalne nadpisanie dostawcy danych fundamentalnych dla konkretnej spółki (`biznesradar`, `yahoo`, `stockanalysis`)
 - `biznesradar_id` — identyfikator spółki na portalu BiznesRadar (wymagany, jeśli różni się od tickera)
 
-Wszystkie interaktywne wejścia tickerów, ręczny zapis sygnałów i importy rekomendacji korzystają z jednego resolvera. Unikalny symbol bez rynku jest kanonizowany na podstawie konfiguracji, np. `XTB` → `XTB.PL`. Jeśli ten sam symbol albo alias pasuje do spółek na kilku rynkach, operacja jest zatrzymywana i komunikat pokazuje dostępne tickery wraz z nazwami spółek. Symbol spoza konfiguracji musi jawnie zawierać rynek (`.PL` albo `.US`). Przed przejściem do kolejnego kroku menu i ponownie przed zapisem system sprawdza tożsamość symbolu, typ `EQUITY`, zgodność rynku oraz dostępność ceny; ETF-y i inne instrumenty niebędące spółkami są odrzucane. Wyniki pozytywne i negatywne trafiają do tabeli SQLite `ticker_registry` na 30 dni. W tym okresie walidacja korzysta z rejestru bez ponownego wywołania Yahoo; błędy połączenia z dostawcą nie są zapisywane w cache'u. Cache identyfikacji instrumentu nie zastępuje osobnego pobrania aktualnej ceny sygnału.
+Wszystkie interaktywne wejścia tickerów, ręczny zapis sygnałów i importy rekomendacji korzystają z jednego resolvera. Unikalny symbol bez rynku jest kanonizowany na podstawie konfiguracji, np. `XTB` → `XTB.PL`. Jeśli ten sam symbol albo alias pasuje do instrumentów na kilku rynkach, operacja jest zatrzymywana i komunikat pokazuje dostępne tickery. Symbol spoza konfiguracji musi jawnie zawierać obsługiwany suffix (`.PL`, `.US`, `.FX` albo `.CMD`). Walidacja Yahoo sprawdza typ odpowiedni dla klasy instrumentu: `EQUITY` dla akcji, `CURRENCY` dla FX i `FUTURE` dla surowcowego proxy. ETF-y nadal są odrzucane jako akcje. Wyniki pozytywne i negatywne trafiają do tabeli SQLite `ticker_registry` na 30 dni. W tym okresie walidacja korzysta z rejestru bez ponownego wywołania Yahoo; cache identyfikacji instrumentu nie zastępuje osobnego pobrania aktualnej ceny sygnału.
+
+Automatyczny runtime rozdziela klasy aktywów. Moduły fundamentalne, rekomendacje spółek, ESPI i moduły zależne od benchmarku akcyjnego nie są uruchamiane dla `.FX`/`.CMD`. Dla instrumentów nieakcyjnych dopuszczone są bezpieczne moduły cenowo-techniczne: ADX, Bollinger, świeczki, dywergencje, wskaźniki techniczne, średnie kroczące, Pivot, Support Bounce oraz alerty zmiany/poziomu ceny. Backtest `.FX` i `.CMD` nie przypisuje automatycznie benchmarku S&P 500.
 
 ## Konfiguracja analizatorów
 
@@ -1289,7 +1308,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - Gdy `startup_diagnostics: true` w `config.yaml`, każdy właściwy przebieg aplikacji bez `--silent` wysyła do konsoli i Telegrama diagnostykę procesu: czas, host, użytkownika, PID, interpreter, pełną komendę oraz dane dwóch poziomów procesów nadrzędnych. Wywołania `--help` i `--menu` nie wysyłają diagnostyki. Po zakończeniu śledztwa ustaw `startup_diagnostics: false`. Ułatwia to ustalenie, czy aplikację uruchomił terminal, plik BAT, launcher Pythona czy Harmonogram zadań Windows.
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
 - `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
-- `--add-ticker <TICKER>` - weryfikuje instrument przez centralny resolver/Yahoo i trwale dopisuje spółkę do `config.yaml`; nowy ticker musi zawierać rynek, np. `NVDA.US` albo `XTB.PL`. Operacja jest idempotentna: ticker już obecny w konfiguracji kończy się sukcesem bez duplikatu. ETF-y, błędny rynek i symbole bez dostępnych notowań są odrzucane. Zapis zachowuje komentarze/formatowanie YAML i jest wykonywany atomowo.
+- `--add-ticker <TICKER>` - weryfikuje instrument przez centralny resolver/Yahoo i trwale dopisuje go do `config.yaml`; nowy ticker musi zawierać suffix rynku/klasy, np. `NVDA.US`, `XTB.PL`, `AUDJPY.FX` albo `XAUUSD.CMD`. Operacja jest idempotentna, a typ Yahoo musi odpowiadać klasie instrumentu.
 - `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US` lub `*.US` dla calego rynku); moduły z `analysis_scope: market` są wtedy pomijane, chyba że zostaną jawnie wskazane przez `--modules`
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
@@ -1455,8 +1474,10 @@ python src/stock_radar.py --ticker XTB.PL,PKO.PL --modules TECH_INDICATORS,ALERT
 # analiza calego rynku amerykanskiego i dodatkowo wybranej spolki z PL
 python src/stock_radar.py --tickers *.US,CDR.PL
 
-# trwałe dodanie zweryfikowanej spółki do config.yaml; dobre API do wywołania np. z XtbTools
+# trwałe dodanie zweryfikowanego instrumentu do config.yaml
 python src/stock_radar.py --add-ticker NVDA.US
+python src/stock_radar.py --add-ticker AUDJPY.FX
+python src/stock_radar.py --add-ticker XAUUSD.CMD
 
 # backfill luk cenowych dla 6 miesiecy wraz ze statystykami domknięć per spółka
 python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
@@ -1466,6 +1487,9 @@ python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --regis
 
 # ręczny zapis sygnału BUY z nazwą modelu AI
 python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.4-nano --register-recommendation-type technical --register-note "AI WWW daily pick"
+
+# ten sam mechanizm działa dla FX; ticker zapisuje się w bazie jako AUDJPY.FX
+python src/stock_radar.py --register-ticker AUDJPY.FX --register-signal BUY --register-module REPORT_AI_DAILY_PICK --register-ai-model gpt-5.6-sol --register-recommendation-type technical
 
 # ręczny zapis wskazania analityka z platformy X
 python src/stock_radar.py --register-ticker CDR.PL --register-signal BUY --register-module REPORT_ANALYST_PICK --register-source-type social_account --register-source-name @trader_xyz --register-source-platform X --register-source-url https://x.com/trader_xyz/status/1 --register-note "Wybicie z konsolidacji"
