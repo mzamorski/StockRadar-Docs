@@ -210,21 +210,23 @@ samej sesji, a po przejściu do kolejnej sesji jako `D` (dni kalendarzowe).
 
 | Sygnał | Warunki |
 |--------|--------|
-| BUY (GAP DOWN) | Open sesji < poprzednie Close o ≥ `min_gap_pct`; sygnał również przy domknięciu w pierwszej H1 |
-| ALERT (GAP UP) | Open > Close poprzedniej świecy o ≥ `min_gap_pct` |
-| ALERT (GAP DOWN) | Open < Close poprzedniej świecy o ≤ `-min_gap_pct` |
+| BUY (GAP DOWN) | Open sesji < poprzednie Close o ≥ `min_gap_pct`; live przy `live_direction_mode: down` lub `both` |
+| SELL (GAP UP) | Open sesji > poprzednie Close o ≥ `min_gap_pct`; live przy `live_direction_mode: up` lub `both` |
+| ALERT (GAP UP/DOWN) | Informacyjny zapis wykrytej luki niezależnie od kierunku sygnału transakcyjnego |
 | 🎯 FILLED | GAP UP: `Low <= poprzednie Close`; GAP DOWN: `High >= poprzednie Close` |
 
 Domyślna minimalna luka: 1.5%, konfigurowalny przez `gap_criteria.min_gap_pct`.
 Ten sam próg jest stosowany w analizie bieżącej i podczas backfillu.
 
-Moduł zapisuje long-only setupy mean-reversion do `trade_signals` jako
-`TECH_GAPS` i wysyła je na Telegram. Dla luki spadkowej zapisuje `BUY`, z celem
-na poprzednim zamknięciu. Sygnał powstaje na świecy otwarcia sesji natychmiast
-po wykryciu luki. Domknięcie w tej samej świecy H1 nie blokuje sygnału.
+Moduł zapisuje setupy mean-reversion do `trade_signals` jako
+`TECH_GAPS` i może wysyłać je na Telegram. Domyślnie zachowuje dotychczasowy
+tryb `live_direction_mode: down`: luka spadkowa daje `BUY`, a celem jest
+poprzednie zamknięcie. Tryb `up` emituje tylko `GAP UP → SELL`, a `both`
+obsługuje oba kierunki. Brak `live_direction_mode` zachowuje zgodność ze
+starszym `long_only`. Sygnał powstaje na świecy otwarcia sesji natychmiast po
+wykryciu luki, a domknięcie w tej samej świecy H1 go nie blokuje.
 `TECH_GAPS` może uczestniczyć w `META_CONFLUENCE` jak pozostałe moduły
-techniczne. Luki wzrostowe pozostają w historii luk, ale przy `long_only: true`
-nie tworzą transakcyjnego sygnału `SELL`.
+techniczne. Backfill sygnałów respektuje ten sam `live_direction_mode`.
 
 Dedykowany backtest gap-fill zakłada wejście po cenie otwarcia luki, brak
 stop-lossa i maksymalnie sześć miesięcy kalendarzowych na domknięcie. Może
@@ -238,10 +240,6 @@ kierunki; bez jawnego wyboru CLI zachowuje kompatybilny tryb `down` z
 Uwzględnia koszty transakcyjne oraz MAE/MFE. Luki bez pełnego
 sześciomiesięcznego okresu obserwacji są oznaczane jako ocenzurowane i nie
 trafiają do mianownika statystyki domknięć.
-
-Ta zmiana dotyczy backtestu. Bieżący zapis sygnałów `TECH_GAPS` pozostaje
-long-only dla `GAP DOWN`, dopóki konfiguracja/strategia sygnałów live nie
-zostanie osobno rozszerzona o short.
 
 Dla pojedynczej spółki dostępny jest również profil wielohoryzontowy. Menu
 **Profil domykania luk dla spółki** pobiera historię H1 raz, analizuje oba
@@ -260,6 +258,61 @@ Minimalną próbę i próg plateau kontrolują odpowiednio
 `gap_strategy.profile_summary_plateau_gain_pct`. Horyzonty i długość historii
 można zmienić w `gap_strategy.profile_horizons_days` oraz
 `gap_strategy.profile_period`.
+
+Profil pokazuje również osobną tabelę **wg wielkości luki**. Każda luka jest
+klasyfikowana jednocześnie do bucketu procentowego (domyślnie
+`1.5–3%`, `3–5%`, `5–8%`, `≥8%`) oraz do bucketu `Gap/ATR`.
+`Gap/ATR` dzieli bezwzględną wielkość luki przez ATR(14) wyliczony z
+poprzednich zamkniętych sesji, więc luka 4% na spokojnej spółce nie jest
+traktowana tak samo jak luka 4% na bardzo zmiennym walorze. Domyślne granice
+ATR to `<0.5×`, `0.5–1×`, `1–1.5×`, `1.5–2×`, `≥2×`. Tabela
+segmentacji jest liczona dla horyzontów 5, 20 i 60 dni i pokazuje osobno
+GAP DOWN/BUY oraz GAP UP/SELL. Przy eksporcie profilu powstaje dodatkowy plik
+`*_size_buckets.csv`.
+
+Dostępny jest też **Gap Opportunity Radar**. Skanuje skonfigurowane spółki
+PL/US, pobiera świeże H1 z Yahoo z pominięciem cache i wybiera niedomknięte
+luki nie starsze domyślnie niż 20 dni. Dla każdej pokazuje wiek, Gap%,
+Gap/ATR, aktualny reżim przy powstaniu luki, odległość do pełnego domknięcia
+oraz historyczne `P(fill 1d/5d/20d/60d)`. Najsilniejsze dopasowanie analogów
+wymaga jednocześnie kierunku, bucketu Gap%, bucketu Gap/ATR i tego samego
+reżimu rynku. Przy zbyt małej dojrzałej próbie radar kolejno odpuszcza reżim,
+następnie Gap/ATR, a na końcu używa samego kierunku. Każda wartość P(fill)
+pokazuje liczebność dojrzałej próby; przy zbyt małej próbie prawdopodobieństwo
+nie jest prezentowane. Radar można uruchomić dla GPW, USA albo obu rynków.
+
+Profil spółki ma dodatkowo **Kaplan–Meier** dla czasu do domknięcia. Otwarte
+luki są w nim obserwacjami ocenzurowanymi, więc nie są błędnie liczone jako
+porażki tylko dlatego, że ich pełny horyzont jeszcze nie minął. Raport pokazuje
+dla kolejnych horyzontów `P(fill)`, `P(open)`, liczbę zdarzeń, cenzorów i
+obserwacji nadal zagrożonych.
+
+Każda luka otrzymuje też reżim rynku wyznaczony wyłącznie z informacji
+dostępnych przed otwarciem danej sesji. Trend to `BULL/BEAR` na podstawie
+poprzedniego Close względem SMA (domyślnie SMA200), a zmienność to
+`HIGH/LOW` na podstawie ATR względem jego historycznej mediany. Profil
+pokazuje osobne statystyki `BULL/LOW`, `BULL/HIGH`, `BEAR/LOW` i
+`BEAR/HIGH`, dzięki czemu można sprawdzić, czy przewaga gap-fill zależy od
+reżimu.
+
+Profil zawiera również **walidację holdout OOS i walk-forward** dla stałych
+reguł gap-fill. Domyślnie używa horyzontu 60 dni, ostatnich 30% obserwacji jako
+holdout oraz kroczących okien train/test. Tabela porównuje fill rate i średni
+wynik netto train vs późniejsze dane testowe. Nie jest to strojenie parametrów,
+tylko kontrola stabilności historycznej przewagi.
+
+Komenda **Odśwież i wylistuj luki cenowe dla spółki** po tabeli niedomkniętych
+luk automatycznie dokłada teraz ten sam kontekst co radar dla wybranej spółki:
+wiek luki, Gap/ATR, reżim, odległość do targetu, P(fill) w kilku horyzontach,
+liczebność analogów i medianowy czas domknięcia.
+
+**Gap Opportunity Journal** zapisuje pierwszy snapshot P(fill) dla każdej luki
+w momencie, gdy pojawi się w radarze/kontekście spółki, nie nadpisuje później
+pierwotnej prognozy, a przy kolejnych uruchomieniach uzupełnia wynik dla
+dojrzałych horyzontów. Raport porównuje średnie prognozowane P(fill) z
+rzeczywistym fill rate i pokazuje błąd kalibracji oraz Brier score. Dzięki temu
+po zebraniu próby można sprawdzić, czy np. historyczne `80%` faktycznie
+zachowuje się jak około `80%`.
 
 ---
 
@@ -1364,7 +1417,10 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--gap-backtest-period <PERIOD>` - okres danych H1, np. `1y`, `2y`; domyślnie `2y`
 - `--gap-direction <MODE>` - kierunek strategii: `down` = GAP DOWN/long, `up` = GAP UP/short, `both` = oba kierunki
 - `--gap-profile-ticker <TICKER>` - wielohoryzontowy profil domykania luk dla jednej spółki; analizuje UP/DOWN osobno
-- `--gap-profile-export <CSV>` - eksportuje tabelę profilu spółki do CSV
+- `--gap-profile-export <CSV>` - eksportuje tabelę profilu spółki do CSV; segmentacja wielkości trafia do sąsiedniego pliku `*_size_buckets.csv`
+- `--gap-opportunity-radar <MARKET>` - skanuje świeże niedomknięte luki dla `ALL`, `PL` albo `US` i pokazuje historyczne P(fill) podobnych przypadków
+- `--gap-opportunity-export <CSV>` - eksportuje Gap Opportunity Radar
+- `--gap-opportunity-journal` - pokazuje kalibrację prognoz P(fill) oraz ostatnie snapshoty radar → wynik
 - `--gap-min-pct <PCT>` - nadpisuje minimalną wielkość luki
 - `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
 - `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
