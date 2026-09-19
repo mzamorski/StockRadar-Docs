@@ -972,6 +972,21 @@ Importer pomija indeksy, kontrakty i wyłączone symbole, mapuje ratingi do `BUY
 - `ingestion_channel`: techniczny kanał zapisu, np. `cli` albo `telegram`
 - `recommendation_type`: `fundamental` albo `technical`; brak wartości oznacza `fundamental`
 
+W interaktywnym menu pole platformy nie jest wpisywane ręcznie. Lista pochodzi z
+`signal_source_platforms` w `config.yaml`:
+
+```yaml
+signal_source_platforms:
+- X
+- YouTube
+- DM
+```
+
+Dodanie kolejnej pozycji, np. `TradingView`, automatycznie rozszerza listę wyboru
+w komendzie **Zarejestruj sygnał analityka lub konta społecznościowego** bez zmian
+w kodzie. Bezpośrednie CLI i import JSON nadal zapisują wartość przekazaną w
+`source_platform`.
+
 Moduł nie ma osobnego analizatora ani harmonogramu. Import JSON, zapis ręczny analityka i automat BiznesRadar korzystają z jednego serwisu zapisu. Deduplikacja opiera się na spółce, kanonicznym ID instytucji, dacie raportu i typie rekomendacji; ponowny zapis może uzupełnić brakującą cenę docelową, notatkę lub URL.
 
 Menu udostępnia zarówno zapis pojedynczego wskazania, jak i opcję **Importuj rekomendacje analityka lub DM z JSON**. Atrybucja może być wspólna dla płaskiej listy `signals` albo określona osobno dla każdej rekomendacji przez pole `institution`.
