@@ -235,14 +235,16 @@ oceniać osobno `GAP DOWN` jako pozycję `BUY`, `GAP UP` jako pozycję
 pokazuje dodatkowo osobne wiersze `TOTAL DOWN` i `TOTAL UP`, dzięki czemu
 wynik long i short nie ginie w jednej średniej. Menu domyślnie proponuje oba
 kierunki; bez jawnego wyboru CLI zachowuje kompatybilny tryb `down` z
-`gap_strategy.direction_mode`. Backtest obejmuje wyłącznie akcje `.PL` i
-`.US`, dla których StockRadar ma zdefiniowane godziny otwarcia sesji.
+`gap_strategy.direction_mode`. Backtest obejmuje akcje `.PL` / `.US` oraz indeksy kasowe `.IDX`, dla
+których StockRadar ma zdefiniowane godziny otwarcia sesji. FX i commodities
+pozostają wykluczone.
 Uwzględnia koszty transakcyjne oraz MAE/MFE. Luki bez pełnego
 sześciomiesięcznego okresu obserwacji są oznaczane jako ocenzurowane i nie
 trafiają do mianownika statystyki domknięć.
 
-Dla pojedynczej spółki dostępny jest również profil wielohoryzontowy. Menu
-**Profil domykania luk dla spółki** pobiera historię H1 raz, analizuje oba
+Dla pojedynczej akcji lub indeksu dostępny jest również profil
+wielohoryzontowy. Menu **Profil domykania luk dla akcji lub indeksu** pobiera
+historię H1 raz, analizuje oba
 kierunki i automatycznie liczy statystyki dla horyzontów 1, 3, 5, 10, 20, 60, 120,
 180 i 365 dni kalendarzowych. Tabela pokazuje osobno dla `GAP DOWN → BUY` i `GAP UP → SELL`:
 liczbę luk, próbę dojrzałą, liczbę domknięć, fill rate, średni i medianowy czas
@@ -263,25 +265,30 @@ Profil pokazuje również osobną tabelę **wg wielkości luki**. Każda luka je
 klasyfikowana jednocześnie do bucketu procentowego (domyślnie
 `1.5–3%`, `3–5%`, `5–8%`, `≥8%`) oraz do bucketu `Gap/ATR`.
 `Gap/ATR` dzieli bezwzględną wielkość luki przez ATR(14) wyliczony z
-poprzednich zamkniętych sesji, więc luka 4% na spokojnej spółce nie jest
-traktowana tak samo jak luka 4% na bardzo zmiennym walorze. Domyślne granice
+poprzednich zamkniętych sesji, więc ta sama nominalna luka na spokojnym
+instrumencie nie jest traktowana tak samo jak na bardzo zmiennym walorze. Domyślne granice
 ATR to `<0.5×`, `0.5–1×`, `1–1.5×`, `1.5–2×`, `≥2×`. Tabela
 segmentacji jest liczona dla horyzontów 5, 20 i 60 dni i pokazuje osobno
 GAP DOWN/BUY oraz GAP UP/SELL. Przy eksporcie profilu powstaje dodatkowy plik
 `*_size_buckets.csv`.
 
-Dostępny jest też **Gap Opportunity Radar**. Skanuje skonfigurowane spółki
-PL/US, pobiera świeże H1 z Yahoo z pominięciem cache i wybiera niedomknięte
-luki nie starsze domyślnie niż 20 dni. Dla każdej pokazuje wiek, Gap%,
-Gap/ATR, aktualny reżim przy powstaniu luki, odległość do pełnego domknięcia
-oraz historyczne `P(fill 1d/5d/20d/60d)`. Najsilniejsze dopasowanie analogów
+Dostępny jest też **Gap Opportunity Radar**. Skanuje skonfigurowane akcje
+PL/US oraz indeksy kasowe IDX, pobiera świeże H1 z Yahoo z pominięciem cache
+i wybiera niedomknięte luki nie starsze domyślnie niż 20 dni. Dla każdej
+pokazuje wiek, Gap%, Gap/ATR, aktualny reżim przy powstaniu luki, odległość
+do pełnego domknięcia oraz historyczne `P(fill 1d/5d/20d/60d)`. Dodatkowo
+dla horyzontu sortowania (domyślnie 5 dni) pokazuje ekonomię dokładnie tego
+samego zestawu analogów: średni wynik netto, profit factor oraz średni MAE.
+Dzięki temu wysoki fill rate nie maskuje sytuacji, w której nieliczne
+niedomknięte luki generowały duże straty. Najsilniejsze dopasowanie analogów
 wymaga jednocześnie kierunku, bucketu Gap%, bucketu Gap/ATR i tego samego
 reżimu rynku. Przy zbyt małej dojrzałej próbie radar kolejno odpuszcza reżim,
 następnie Gap/ATR, a na końcu używa samego kierunku. Każda wartość P(fill)
 pokazuje liczebność dojrzałej próby; przy zbyt małej próbie prawdopodobieństwo
-nie jest prezentowane. Radar można uruchomić dla GPW, USA albo obu rynków.
+nie jest prezentowane. Radar można uruchomić dla GPW, USA, samych indeksów
+(`IDX`) albo całego wspieranego uniwersum (`ALL`).
 
-Profil spółki ma dodatkowo **Kaplan–Meier** dla czasu do domknięcia. Otwarte
+Profil instrumentu ma dodatkowo **Kaplan–Meier** dla czasu do domknięcia. Otwarte
 luki są w nim obserwacjami ocenzurowanymi, więc nie są błędnie liczone jako
 porażki tylko dlatego, że ich pełny horyzont jeszcze nie minął. Raport pokazuje
 dla kolejnych horyzontów `P(fill)`, `P(open)`, liczbę zdarzeń, cenzorów i
@@ -1223,6 +1230,12 @@ tickers:
       fund_provider: "biznesradar"
       biznesradar_id: "CD-PROJEKT"
       priority: "high"
+  IDX:
+    NDX:
+      display_name: "NASDAQ-100 cash index"
+      enabled: false
+      gap_enabled: true
+      keywords: ["NASDAQ-100", "NASDAQ", "US100"]
   FX:
     AUDJPY:
       display_name: "AUD/JPY"
@@ -1235,12 +1248,15 @@ tickers:
 ```
 
 Kanoniczny suffix określa klasę instrumentu: `.PL` i `.US` oznaczają akcje,
-`.FX` pary walutowe, a `.CMD` surowce. StockRadar zachowuje te identyfikatory
-w bazie (np. `AUDJPY.FX`, `XAUUSD.CMD`) i osobno tłumaczy je na symbol
-dostawcy danych. Dla Yahoo pary FX używają formatu `AUDJPY=X`; standardowe
-surowce są mapowane na płynne kontrakty futures, np. `XAUUSD.CMD -> GC=F`
-i `WTIUSD.CMD -> CL=F`. Pole `yahoo_symbol` pozwala jawnie nadpisać mapowanie
-dla kolejnych surowców.
+`.IDX` indeksy kasowe, `.FX` pary walutowe, a `.CMD` surowce. StockRadar
+zachowuje te identyfikatory w bazie i osobno tłumaczy je na symbol dostawcy
+danych. Wbudowane mapowania indeksów Yahoo to `NDX.IDX -> ^NDX`,
+`SPX.IDX -> ^GSPC` i `DJI.IDX -> ^DJI`. Dla Yahoo pary FX używają formatu
+`AUDJPY=X`; standardowe surowce są mapowane na płynne kontrakty futures,
+np. `XAUUSD.CMD -> GC=F` i `WTIUSD.CMD -> CL=F`. Pole `yahoo_symbol`
+pozwala jawnie nadpisać mapowanie dla kolejnych instrumentów. Dla indeksów
+pole `gap_enabled: true` pozwala włączyć je do analiz luk przy jednoczesnym
+`enabled: false`, czyli bez uruchamiania ich w zwykłym schedulerze.
 
 Obsługiwane pola zależne od modułu:
 
@@ -1255,7 +1271,7 @@ Obsługiwane pola zależne od modułu:
 - `fund_provider` — opcjonalne nadpisanie dostawcy danych fundamentalnych dla konkretnej spółki (`biznesradar`, `yahoo`, `stockanalysis`)
 - `biznesradar_id` — identyfikator spółki na portalu BiznesRadar (wymagany, jeśli różni się od tickera)
 
-Wszystkie interaktywne wejścia tickerów, ręczny zapis sygnałów i importy rekomendacji korzystają z jednego resolvera. Unikalny symbol bez rynku jest kanonizowany na podstawie konfiguracji, np. `XTB` → `XTB.PL`. Jeśli ten sam symbol albo alias pasuje do instrumentów na kilku rynkach, operacja jest zatrzymywana i komunikat pokazuje dostępne tickery. Symbol spoza konfiguracji musi jawnie zawierać obsługiwany suffix (`.PL`, `.US`, `.FX` albo `.CMD`). Walidacja Yahoo sprawdza typ odpowiedni dla klasy instrumentu: `EQUITY` dla akcji, `CURRENCY` dla FX i `FUTURE` dla surowcowego proxy. ETF-y nadal są odrzucane jako akcje. Wyniki pozytywne i negatywne trafiają do tabeli SQLite `ticker_registry` na 30 dni. W tym okresie walidacja korzysta z rejestru bez ponownego wywołania Yahoo; cache identyfikacji instrumentu nie zastępuje osobnego pobrania aktualnej ceny sygnału.
+Wszystkie interaktywne wejścia tickerów, ręczny zapis sygnałów i importy rekomendacji korzystają z jednego resolvera. Unikalny symbol bez rynku jest kanonizowany na podstawie konfiguracji, np. `XTB` → `XTB.PL`. Jeśli ten sam symbol albo alias pasuje do instrumentów na kilku rynkach, operacja jest zatrzymywana i komunikat pokazuje dostępne tickery. Symbol spoza konfiguracji musi jawnie zawierać obsługiwany suffix (`.PL`, `.US`, `.IDX`, `.FX` albo `.CMD`). Walidacja Yahoo sprawdza typ odpowiedni dla klasy instrumentu: `EQUITY` dla akcji, `INDEX` dla indeksów kasowych, `CURRENCY` dla FX i `FUTURE` dla surowcowego proxy. ETF-y nadal są odrzucane jako akcje. Wyniki pozytywne i negatywne trafiają do tabeli SQLite `ticker_registry` na 30 dni. W tym okresie walidacja korzysta z rejestru bez ponownego wywołania Yahoo; cache identyfikacji instrumentu nie zastępuje osobnego pobrania aktualnej ceny sygnału.
 
 Automatyczny runtime rozdziela klasy aktywów. Moduły fundamentalne, rekomendacje spółek, ESPI i moduły zależne od benchmarku akcyjnego nie są uruchamiane dla `.FX`/`.CMD`. Dla instrumentów nieakcyjnych dopuszczone są bezpieczne moduły cenowo-techniczne: ADX, Bollinger, świeczki, dywergencje, wskaźniki techniczne, średnie kroczące, Pivot, Support Bounce oraz alerty zmiany/poziomu ceny. Backtest `.FX` i `.CMD` nie przypisuje automatycznie benchmarku S&P 500.
 
@@ -1277,11 +1293,25 @@ gap_criteria:
 gap_strategy:
   trade_signals_enabled: true
   signal_module_name: TECH_GAPS
-  session_open_times: {PL: "09:00", US: "09:30"}
+  session_open_times: {PL: "09:00", US: "09:30", IDX: "09:30"}
   long_only: true
   max_holding_months: 6
   transaction_cost_pct: 0.2
 ```
+
+Indeksy kasowe mają osobną klasę `INDEX` i mogą uczestniczyć w statystycznym
+pipeline gap-fill. Dla `NDX.IDX`, `SPX.IDX` i `DJI.IDX` luka jest definiowana
+na sesji kasowej USA: poprzedni cash close → następny bar otwarcia o 09:30
+`America/New_York`. Dzięki temu analiza nie miesza luk kasowych z overnight
+ruchem futures albo godzinami handlu CFD typu US100.
+
+Dla `.IDX` dostępne są: backtest gap-fill, profil wielohoryzontowy, Gap/ATR,
+Kaplan–Meier, reżimy rynku, OOS/walk-forward, Gap Opportunity Radar oraz
+Gap Opportunity Journal. `.FX` i `.CMD` pozostają wykluczone z gap-fill.
+
+Ta obsługa indeksów dotyczy analiz historycznych/radarowych. Bieżący moduł
+`TECH_GAPS`, jego backfill sygnałów oraz lista luk SQLite pozostają w tym
+zakresie bez zmian i nie są automatycznie rozszerzane na indeksy.
 
 ### Rozbieżności techniczne (TECH_DIVERGENCE)
 
@@ -1420,7 +1450,7 @@ Dodatkowo kontrolowany jest trwały `yahoo_cache.db`.
 
 Dostępne są dwa zakresy:
 - `quick` — domyślnie po 2 aktywne instrumenty z każdego skonfigurowanego rynku,
-- `full` — wszystkie aktywne instrumenty PL/US/FX/CMD.
+- `full` — wszystkie aktywne instrumenty PL/US/IDX/FX/CMD.
 
 Progi świeżości i liczebność próbki można zmienić w sekcji
 `data_quality_monitor` w `config.yaml`. Wynik można eksportować do CSV.
@@ -1451,7 +1481,7 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - Gdy `startup_diagnostics: true` w `config.yaml`, każdy właściwy przebieg aplikacji bez `--silent` wysyła do konsoli i Telegrama diagnostykę procesu: czas, host, użytkownika, PID, interpreter, pełną komendę oraz dane dwóch poziomów procesów nadrzędnych. Wywołania `--help` i `--menu` nie wysyłają diagnostyki. Po zakończeniu śledztwa ustaw `startup_diagnostics: false`. Ułatwia to ustalenie, czy aplikację uruchomił terminal, plik BAT, launcher Pythona czy Harmonogram zadań Windows.
 - `--no-session` - resetuje i pomija trwały stan z `session_state.db`
 - `--list-tickers` - wypisuje wszystkie skonfigurowane tickery po przecinku i konczy dzialanie
-- `--add-ticker <TICKER>` - weryfikuje instrument przez centralny resolver/Yahoo i trwale dopisuje go do `config.yaml`; nowy ticker musi zawierać suffix rynku/klasy, np. `NVDA.US`, `XTB.PL`, `AUDJPY.FX` albo `XAUUSD.CMD`. Operacja jest idempotentna, a typ Yahoo musi odpowiadać klasie instrumentu.
+- `--add-ticker <TICKER>` - weryfikuje instrument przez centralny resolver/Yahoo i trwale dopisuje go do `config.yaml`; nowy ticker musi zawierać suffix rynku/klasy, np. `NVDA.US`, `XTB.PL`, `NDX.IDX`, `AUDJPY.FX` albo `XAUUSD.CMD`. Operacja jest idempotentna, a typ Yahoo musi odpowiadać klasie instrumentu.
 - `--tickers <T1,T2,...>` - ogranicza analizę do wybranych tickerow (np. `PKO.PL,MSFT.US` lub `*.US` dla calego rynku); moduły z `analysis_scope: market` są wtedy pomijane, chyba że zostaną jawnie wskazane przez `--modules`
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
@@ -1462,9 +1492,9 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `--backtest-gap-fill` - uruchamia dedykowany backtest strategii domykania luk
 - `--gap-backtest-period <PERIOD>` - okres danych H1, np. `1y`, `2y`; domyślnie `2y`
 - `--gap-direction <MODE>` - kierunek strategii: `down` = GAP DOWN/long, `up` = GAP UP/short, `both` = oba kierunki
-- `--gap-profile-ticker <TICKER>` - wielohoryzontowy profil domykania luk dla jednej spółki; analizuje UP/DOWN osobno
-- `--gap-profile-export <CSV>` - eksportuje tabelę profilu spółki do CSV; segmentacja wielkości trafia do sąsiedniego pliku `*_size_buckets.csv`
-- `--gap-opportunity-radar <MARKET>` - skanuje świeże niedomknięte luki dla `ALL`, `PL` albo `US` i pokazuje historyczne P(fill) podobnych przypadków
+- `--gap-profile-ticker <TICKER>` - wielohoryzontowy profil domykania luk dla akcji lub indeksu kasowego; analizuje UP/DOWN osobno
+- `--gap-profile-export <CSV>` - eksportuje tabelę profilu instrumentu do CSV; segmentacja wielkości trafia do sąsiedniego pliku `*_size_buckets.csv`
+- `--gap-opportunity-radar <MARKET>` - skanuje świeże niedomknięte luki dla `ALL`, `PL`, `US` albo `IDX` i pokazuje historyczne P(fill) podobnych przypadków
 - `--gap-opportunity-export <CSV>` - eksportuje Gap Opportunity Radar
 - `--gap-opportunity-journal` - pokazuje kalibrację prognoz P(fill) oraz ostatnie snapshoty radar → wynik
 - `--data-quality-monitor <MODE>` - sprawdza świeżość i spójność Yahoo/SQLite; `quick` = próbka per rynek, `full` = wszystkie aktywne instrumenty
@@ -1629,6 +1659,13 @@ python src/stock_radar.py --tickers *.US,CDR.PL
 python src/stock_radar.py --add-ticker NVDA.US
 python src/stock_radar.py --add-ticker AUDJPY.FX
 python src/stock_radar.py --add-ticker XAUUSD.CMD
+python src/stock_radar.py --add-ticker NDX.IDX
+
+# profil cash-session gap-fill dla NASDAQ-100
+python src/stock_radar.py --gap-profile-ticker NDX.IDX
+
+# radar tylko dla indeksów kasowych
+python src/stock_radar.py --gap-opportunity-radar IDX
 
 # backfill luk cenowych dla 6 miesiecy wraz ze statystykami domknięć per spółka
 python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
