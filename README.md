@@ -1388,6 +1388,52 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 /run TECH_GAPS
 ```
 
+## Data Quality Monitor
+
+W menu **Techniczne** dostępny jest **Data Quality Monitor — świeżość i spójność danych**.
+Monitor wykonuje aktywne, świeże zapytania do Yahoo z pominięciem 60-sekundowego
+cache'u i zwraca status zbiorczy `OK / WARN / ERROR`.
+
+Dla Yahoo sprawdzane są osobno H1 i Daily: wiek ostatniej świecy, obecność OHLC,
+nieprawidłowe lub niedodatnie ceny, duplikaty timestampów, kolejność danych,
+ujemny wolumen oraz potencjalnie brakujące świece H1 wewnątrz sesji. Przy
+otwartym rynku świeżość H1 jest oceniana w godzinach. Poza sesją oraz dla Daily
+używane są dni robocze, dzięki czemu zwykły weekend nie powoduje alarmu.
+Jeżeli Yahoo zwróci wadliwą ostatnią świecę Daily z bieżącej daty (np. weekendowy
+placeholder FX), monitor traktuje ją jako niekompletną obserwację tymczasową:
+pokazuje `WARN`, pomija ją w liczniku historycznych błędów OHLC i nadal podaje
+timestamp oraz przyczynę.
+
+Dla zakończonych świec monitor rozróżnia pojedyncze anomalie providera od
+uszkodzonej próbki. Izolowany historyczny rekord OHLC ma `WARN`; `ERROR`
+pojawia się po przekroczeniu `ohlc_error_min_rows` albo
+`ohlc_error_ratio_pct`. Jeżeli wadliwy jest najnowszy zakończony Daily,
+monitor wykorzystuje pobrane wcześniej H1: poprawne H1 z tej samej sesji
+obniża wynik do `WARN` i opisuje problem jako niespójność feedu Yahoo Daily.
+Brak takiego potwierdzenia pozostawia `ERROR`. Raport zawsze zawiera konkretny
+timestamp oraz typ naruszenia OHLC.
+
+Monitor sprawdza też `PRAGMA quick_check` głównej bazy SQLite oraz stan
+`trade_signals`, `price_gaps`, `ticker_registry` i
+`gap_opportunity_journal`. Raportuje liczbę rekordów i najnowszy timestamp.
+Dodatkowo kontrolowany jest trwały `yahoo_cache.db`.
+
+Dostępne są dwa zakresy:
+- `quick` — domyślnie po 2 aktywne instrumenty z każdego skonfigurowanego rynku,
+- `full` — wszystkie aktywne instrumenty PL/US/FX/CMD.
+
+Progi świeżości i liczebność próbki można zmienić w sekcji
+`data_quality_monitor` w `config.yaml`. Wynik można eksportować do CSV.
+Komenda kończy się kodem wyjścia `1`, jeśli wykryto co najmniej jeden status
+`ERROR`, dzięki czemu można jej użyć również w skryptach diagnostycznych.
+
+Przykłady:
+
+```powershell
+python src/stock_radar.py --data-quality-monitor quick
+python src/stock_radar.py --data-quality-monitor full --data-quality-export data_quality.csv
+```
+
 ## Tryby pracy CLI
 
 - `standard`: domyslny przebieg analizy (z opcjonalnym `--schedule`)
@@ -1410,7 +1456,7 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--modules <M1,M2,...>` - wlacza tylko podane moduly (pozostale sa tymczasowo wylaczane)
 - `--backfill-gaps` - uruchamia backfill historii luk cenowych (`TECH_GAPS`)
 - `--backfill-period <PERIOD>` - okres backfillu, np. `3mo`, `6mo`, `1y` (domyslnie `1y`)
-- `--backfill-gap-signals` - idempotentnie zapisuje historyczne luki sesyjne `DOWN` jako `TECH_GAPS / BUY` w `trade_signals`
+- `--backfill-gap-signals` - idempotentnie zapisuje historyczne luki sesyjne zgodnie z `gap_strategy.live_direction_mode` jako `TECH_GAPS`
 - `--list-price-gaps <TICKER>` - przed wyświetleniem wymusza świeże pobranie H1 z Yahoo (bez 60-sekundowego cache), przelicza luki i status ich domknięcia dla okresu `gap_strategy.list_refresh_period`, zapisuje wynik do SQLite i dopiero potem wyświetla tabelę
 - `--gap-list-status <STATUS>` - filtr tabeli luk: `unfilled` (domyślnie), `filled` albo `all`
 - `--backtest-gap-fill` - uruchamia dedykowany backtest strategii domykania luk
@@ -1421,6 +1467,8 @@ Natychmiastowe uruchomienie modulu z Telegrama:
 - `--gap-opportunity-radar <MARKET>` - skanuje świeże niedomknięte luki dla `ALL`, `PL` albo `US` i pokazuje historyczne P(fill) podobnych przypadków
 - `--gap-opportunity-export <CSV>` - eksportuje Gap Opportunity Radar
 - `--gap-opportunity-journal` - pokazuje kalibrację prognoz P(fill) oraz ostatnie snapshoty radar → wynik
+- `--data-quality-monitor <MODE>` - sprawdza świeżość i spójność Yahoo/SQLite; `quick` = próbka per rynek, `full` = wszystkie aktywne instrumenty
+- `--data-quality-export <CSV>` - eksportuje szczegóły Data Quality Monitor do CSV
 - `--gap-min-pct <PCT>` - nadpisuje minimalną wielkość luki
 - `--gap-max-holding-months <N>` - maksymalny czas pozycji w miesiącach kalendarzowych
 - `--gap-transaction-cost-pct <PCT>` - łączny koszt wejścia i wyjścia
