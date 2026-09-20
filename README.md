@@ -1354,7 +1354,8 @@ Kanoniczny suffix określa klasę instrumentu: `.PL` i `.US` oznaczają akcje,
 `.IDX` indeksy kasowe, `.FX` pary walutowe, a `.CMD` surowce. StockRadar
 zachowuje te identyfikatory w bazie i osobno tłumaczy je na symbol dostawcy
 danych. Wbudowane mapowania indeksów Yahoo to `NDX.IDX -> ^NDX`,
-`SPX.IDX -> ^GSPC` i `DJI.IDX -> ^DJI`. Dla Yahoo pary FX używają formatu
+`SPX.IDX -> ^GSPC`, `DJI.IDX -> ^DJI` i
+`WIG20.IDX -> WIG20.WA`. Dla Yahoo pary FX używają formatu
 `AUDJPY=X`; standardowe surowce są mapowane na płynne kontrakty futures,
 np. `XAUUSD.CMD -> GC=F` i `WTIUSD.CMD -> CL=F`. Pole `yahoo_symbol`
 pozwala jawnie nadpisać mapowanie dla kolejnych instrumentów. Dla indeksów
@@ -1396,7 +1397,11 @@ gap_criteria:
 gap_strategy:
   trade_signals_enabled: true
   signal_module_name: TECH_GAPS
-  session_open_times: {PL: "09:00", US: "09:30", IDX: "09:30"}
+  session_open_times:
+    PL: "09:00"
+    US: "09:30"
+    IDX: "09:30"
+    WIG20.IDX: "09:00"
   long_only: true
   max_holding_months: 6
   transaction_cost_pct: 0.2
@@ -1404,9 +1409,10 @@ gap_strategy:
 
 Indeksy kasowe mają osobną klasę `INDEX` i mogą uczestniczyć w statystycznym
 pipeline gap-fill. Dla `NDX.IDX`, `SPX.IDX` i `DJI.IDX` luka jest definiowana
-na sesji kasowej USA: poprzedni cash close → następny bar otwarcia o 09:30
-`America/New_York`. Dzięki temu analiza nie miesza luk kasowych z overnight
-ruchem futures albo godzinami handlu CFD typu US100.
+na sesji kasowej USA: poprzedni cash close → następny bar otwarcia o 09:30.
+`WIG20.IDX` korzysta z Yahoo `WIG20.WA` i ma indywidualny override otwarcia
+`09:00`, zgodny z sesją kasową GPW. Klucze tickerów w `session_open_times`
+mają pierwszeństwo przed domyślną godziną dla całej klasy rynku `IDX`.
 
 Dla `.IDX` dostępne są: backtest gap-fill, profil wielohoryzontowy, Gap/ATR,
 Kaplan–Meier, reżimy rynku, OOS/walk-forward, Gap Opportunity Radar oraz
