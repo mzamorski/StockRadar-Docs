@@ -55,6 +55,7 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
 | `REPORT_MORNING_BRIEF` | Raport | informacyjny |
 | `REPORT_MARKET_ACTIVITY` | Raport rynkowy | TOP N wg obrotu / wolumenu / RVOL |
+| `REPORT_WEEKEND_NASDAQ` | Raport rynkowy | weekendowy konsensus proxy Nasdaq + walidacja CME |
 
 ### Klasyfikacja mechanizmu generowania sygnałów
 
@@ -1222,7 +1223,66 @@ schedulera jest liczony od czasu uruchomienia modułu, a nie od pełnej godziny.
 
 ---
 
+### REPORT_WEEKEND_NASDAQ
 
+Buduje informacyjny konsensus weekendowej ekspozycji na Nasdaq z niezależnych
+instrumentów 24/7. Nie łączy ich surowych cen: każdy provider jest normalizowany
+do własnej ceny referencyjnej z ostatniego piątku o 17:00 czasu
+`America/New_York` (zamknięcie tygodniowej sesji CME), a wynik agregowany jest
+jako mediana zmian procentowych.
+
+Domyślne źródła bez klucza API:
+
+- Hyperliquid `xyz:XYZ100`,
+- OKX `US100-USDT-SWAP`,
+- Kraken `PF_QQQXUSD` — perpetual oparty o QQQx (ekspozycja Nasdaq-100),
+- Paradex — automatyczne wyszukanie kontraktu perpetual zawierającego `US100`.
+
+Moduł działa fail-soft: awaria lub brak instrumentu u jednego providera nie
+blokuje pozostałych. Konsensus wymaga co najmniej `min_sources`. Miara
+`dispersion_pct` to MAD (mediana bezwzględnych odchyleń zmian od mediany),
+dzięki czemu pojedynczy odstający feed nie dominuje wyniku.
+
+Okno pracy jest pilnowane wewnątrz modułu według czasu Nowego Jorku:
+
+- od piątku 17:05 ET do niedzieli 18:00 ET — zbieranie snapshotów,
+- od niedzieli 18:00 ET przez `validation_window_minutes` — walidacja
+  ostatniego konsensusu względem otwarcia futures `NQ=F`,
+- poza tym moduł kończy przebieg bez pobierania danych.
+
+Snapshoty trafiają do `weekend_market_snapshots`, a wynik walidacji do
+`weekend_nasdaq_validations`. Zapisywana jest m.in. faktyczna luka otwarcia
+NQ, błąd konsensusu w punktach procentowych oraz zgodność kierunku. Dane te są
+przeznaczone do późniejszej oceny jakości poszczególnych weekendów; moduł nie
+tworzy `trade_signals`.
+
+Przykład konfiguracji:
+
+```yaml
+modules:
+  REPORT_WEEKEND_NASDAQ:
+    enabled: true
+    notify: true
+    log_console: true
+    module_role: report
+    analysis_scope: market
+    interval_minutes: 15
+    active_hours: ["00:00-23:59"]
+
+weekend_nasdaq:
+  min_sources: 2
+  preferred_min_sources: 3
+  neutral_band_pct: 0.20
+  alert_move_pct: 0.50
+  max_dispersion_pct: 0.40
+  persist_snapshots: true
+  validate_cme_open: true
+  nq_symbol: "NQ=F"
+```
+
+To są weekendowe proxy, a nie oficjalne notowania Nasdaq ani CME NQ.
+
+---
 
 ## Harmonogram modułów
 
@@ -1660,6 +1720,7 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `REPORT_AI_RECOMMENDATIONS`
 - `REPORT_ANALYST_PICK`
 - `REPORT_MARKET_ACTIVITY`
+- `REPORT_WEEKEND_NASDAQ`
 - `ALERT_PRICE_CHANGE`
 - `ALERT_PRICE_LEVEL`
 - `FEED_CALENDAR`
@@ -1683,7 +1744,7 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `TECH_SUPPORT_BOUNCE`
 - `TECH_VOLUME`
 
-Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MARKET_ACTIVITY`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
+Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MARKET_ACTIVITY`, `WEEKEND_NASDAQ`, `NASDAQ_WEEKEND`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
 
 ## Przyklady CLI
 
