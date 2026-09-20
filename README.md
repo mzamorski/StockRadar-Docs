@@ -2,6 +2,11 @@
 
 StockRadar to prywatny radar giełdowy dla GPW i wybranych spółek zagranicznych. System pobiera dane z wielu źródeł, analizuje je modułowo i wysyła alerty do Telegrama.
 
+## Architektura systemu
+
+[![Architektura systemu StockRadar](res/system-architecture.png)](res/system-architecture.png)
+
+
 ## Struktura projektu
 
 ```text
