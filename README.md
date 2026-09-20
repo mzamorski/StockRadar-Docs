@@ -288,6 +288,44 @@ pokazuje liczebność dojrzałej próby; przy zbyt małej próbie prawdopodobie�
 nie jest prezentowane. Radar można uruchomić dla GPW, USA, samych indeksów
 (`IDX`) albo całego wspieranego uniwersum (`ALL`).
 
+Dla prostszej interpretacji dostępny jest **Gap Fill Scorecard**. To skrócony
+widok przeznaczony do odpowiedzi na pytanie: „jakie jest historyczne
+prawdopodobieństwo domknięcia luki w X dni i jak wygląda jakość tego setupu?”.
+Dla każdego horyzontu i kierunku pokazuje tylko:
+
+- `P(fill)` — historyczne prawdopodobieństwo pełnego domknięcia; w profilu
+  instrumentu liczone metodą Kaplan–Meier,
+- `Score 0–100` — osobna heurystyczna ocena jakości setupu,
+- `Wiarygodność` — niska / średnia / wysoka na podstawie liczebności próby,
+- prostą interpretację: `słabo`, `ostrożnie`, `neutralnie`, `dobrze`
+  lub `bardzo dobrze`.
+
+Score nie jest drugim prawdopodobieństwem ani rekomendacją inwestycyjną.
+Składa się w 60% z P(fill), w 25% z historycznej ekonomiki (średni wynik netto
+i profit factor) oraz w 15% z ryzyka mierzonego MAE. Ujemny średni wynik netto
+i profit factor poniżej 1 nakładają dodatkową karę, żeby wysoki fill rate nie
+maskował stratnych timeoutów. Przy małej próbie score jest automatycznie
+ściągany w stronę neutralnych 50 punktów. Domyślne
+horyzonty historyczne to 1, 5, 20, 60 i 120 dni; kontroluje je
+`gap_strategy.scorecard_horizons_days`.
+
+Jeżeli dla instrumentu istnieje świeża niedomknięta luka, Scorecard pokazuje
+też drugą, krótką tabelę dla tej konkretnej luki. Używa tej samej reguły
+doboru analogów co Gap Opportunity Radar, ale P(fill) przelicza warunkowo
+względem bieżącego wieku luki. Dla wieku `A` i przyszłego horyzontu `H`
+pokazuje `P(fill next H) = 1 - S(A+H) / S(A)`, gdzie `S` jest estymatą
+Kaplan–Meiera. Pole `risk=N` oznacza liczbę historycznych analogów, które
+pozostawały jeszcze otwarte przy wieku `A`; cenzurowanie po tym wieku jest
+obsługiwane przez Kaplan–Meiera.
+
+Score bieżącej luki używa warunkowego `P(fill next H)`, natomiast komponent
+ekonomiki (avg net + profit factor + MAE) nadal opisuje historyczne setupy
+liczone od ich otwarcia. Sama estymata `P(fill next H)` jest pokazywana już
+przy `risk > 0`, ale score pozostaje ukryty, dopóki liczebność użyta do score
+nie osiągnie `gap_strategy.scorecard_min_sample`. Dzięki temu mała próba nie
+blokuje informacji opisowej, ale nie generuje pozornie precyzyjnej oceny
+0–100. Wynik nie jest estymatą zwrotu z wejścia w bieżącą lukę dzisiaj.
+
 Profil instrumentu ma dodatkowo **Kaplan–Meier** dla czasu do domknięcia. Otwarte
 luki są w nim obserwacjami ocenzurowanymi, więc nie są błędnie liczone jako
 porażki tylko dlatego, że ich pełny horyzont jeszcze nie minął. Raport pokazuje
@@ -1494,6 +1532,8 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `--gap-direction <MODE>` - kierunek strategii: `down` = GAP DOWN/long, `up` = GAP UP/short, `both` = oba kierunki
 - `--gap-profile-ticker <TICKER>` - wielohoryzontowy profil domykania luk dla akcji lub indeksu kasowego; analizuje UP/DOWN osobno
 - `--gap-profile-export <CSV>` - eksportuje tabelę profilu instrumentu do CSV; segmentacja wielkości trafia do sąsiedniego pliku `*_size_buckets.csv`
+- `--gap-scorecard-ticker <TICKER>` - prosty Gap Fill Scorecard: P(fill), score 0–100, wiarygodność i interpretacja per horyzont/kierunek; dla świeżej otwartej luki pokazuje warunkowe P(fill next H) względem jej aktualnego wieku
+- `--gap-scorecard-export <CSV>` - eksportuje historyczny scorecard; bieżąca luka trafia do sąsiedniego pliku `*_current.csv`
 - `--gap-opportunity-radar <MARKET>` - skanuje świeże niedomknięte luki dla `ALL`, `PL`, `US` albo `IDX` i pokazuje historyczne P(fill) podobnych przypadków
 - `--gap-opportunity-export <CSV>` - eksportuje Gap Opportunity Radar
 - `--gap-opportunity-journal` - pokazuje kalibrację prognoz P(fill) oraz ostatnie snapshoty radar → wynik
@@ -1666,6 +1706,9 @@ python src/stock_radar.py --gap-profile-ticker NDX.IDX
 
 # radar tylko dla indeksów kasowych
 python src/stock_radar.py --gap-opportunity-radar IDX
+
+# prosty scorecard P(fill) + score dla NASDAQ-100
+python src/stock_radar.py --gap-scorecard-ticker NDX.IDX
 
 # backfill luk cenowych dla 6 miesiecy wraz ze statystykami domknięć per spółka
 python src/stock_radar.py --backfill-gaps --backfill-period 6mo --ticker CDR.PL,PKO.PL
