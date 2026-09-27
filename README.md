@@ -54,6 +54,7 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | `REPORT_AI_DAILY_PICK` | Raport (AI) | pick dnia |
 | `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
 | `REPORT_MORNING_BRIEF` | Raport | informacyjny |
+| `REPORT_MARKET_REGIME` | Raport rynkowy | osobny score 0–100 dla USA i GPW |
 | `REPORT_MARKET_ACTIVITY` | Raport rynkowy | TOP N wg obrotu / wolumenu / RVOL |
 | `REPORT_WEEKEND_NASDAQ` | Raport rynkowy | weekendowy konsensus proxy Nasdaq + walidacja CME |
 
@@ -1164,14 +1165,48 @@ W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `inte
 
 ---
 
+### REPORT_MARKET_REGIME
+
+Liczy dwa własne, informacyjne wskaźniki kondycji rynku w skali 0–100:
+
+- 🇺🇸 **US Market Regime Score** — Trend/Breadth 40%, Volatility/Stress 25%, Credit/Liquidity 20%, Risk Appetite 15%.
+- 🇵🇱 **GPW Market Regime Score** — Breadth 45%, Trend 25%, Participation 15%, Activity/Vol 15%.
+
+`100` oznacza szeroki, zdrowy risk-on, a `0` silny risk-off/stres. Wynik jest raportowany
+razem ze składowymi oraz flagami diagnostycznymi, m.in. `ATH_NARROW_RALLY`,
+`BREADTH_DIVERGENCE`, `VOLATILITY_STRESS`, `CREDIT_STRESS`,
+`SMALL_CAP_WEAKNESS`, `BROAD_RALLY` i `RECOVERING`.
+
+Dla USA szerokość rynku jest liczona na stałym koszyku dużych, płynnych spółek,
+a szerokość poza megacapami jest dodatkowo kontrolowana przez relacje `RSP/SPY`
+i `IWM/SPY`. Stres zmienności wykorzystuje VIX i, gdy dane są dostępne, relację
+VIX/VIX3M. Credit wykorzystuje `HYG/LQD`.
+
+Dla GPW silnik wykorzystuje szeroki koszyk z `TECH_MARKET_BREADTH`, ale wynik jest
+rozszerzony o trend benchmarku, relatywne uczestnictwo mWIG/sWIG wobec WIG20 oraz
+realized volatility i kierunkowy dollar-volume. Stary `TECH_MARKET_BREADTH` pozostaje
+dostępny zgodnościowo, lecz w domyślnej konfiguracji jest wyłączony, aby nie dublować
+raportu.
+
+Składowe o naturalnej skali rynkowej są normalizowane historycznym percentylem
+(domyślnie do 756 sesji); breadth zachowuje również bezpośredni poziom `% > SMA50`,
+`% > SMA200` i udział wzrostów. Dzięki temu score reaguje na zmianę reżimu bez
+sztywnych progów typu „VIX 20 = strach”.
+
+Codzienny snapshot jest zapisywany do `market_regime_snapshots`. Dane mają służyć
+do późniejszej walidacji OOS; `REPORT_MARKET_REGIME` nie tworzy sygnału BUY/SELL
+i na tym etapie nie steruje `META_CONFLUENCE`.
+
+---
+
 ### REPORT_MORNING_BRIEF
 
 Generuje poranny przegląd rynkowy (raz dziennie).
 
-**Dane:** Fear & Greed Index, Yahoo Finance (S&P500, VIX, USD/PLN, US 10Y)
+**Dane:** CNN Fear & Greed (zewnętrzny benchmark), Yahoo Finance (S&P500, VIX, USD/PLN, US 10Y)
 
 Zawiera:
-- Fear & Greed Index (nastroje rynku)
+- CNN Fear & Greed (zewnętrzny sentyment; bez mapowania Fear→BUY / Greed→SELL)
 - S&P 500 (zmiana 1-dniowa i 5-dniowa)
 - VIX (indeks zmienności — rośnie gdy rynek się boi)
 - USD/PLN (kurs dolara)
@@ -1726,6 +1761,7 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `REPORT_AI_RECOMMENDATIONS`
 - `REPORT_ANALYST_PICK`
 - `REPORT_MARKET_ACTIVITY`
+- `REPORT_MARKET_REGIME`
 - `REPORT_WEEKEND_NASDAQ`
 - `ALERT_PRICE_CHANGE`
 - `ALERT_PRICE_LEVEL`
@@ -1750,7 +1786,7 @@ python src/stock_radar.py --data-quality-monitor full --data-quality-export data
 - `TECH_SUPPORT_BOUNCE`
 - `TECH_VOLUME`
 
-Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MARKET_ACTIVITY`, `WEEKEND_NASDAQ`, `NASDAQ_WEEKEND`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
+Dla `--modules` dzialaja tez legacy aliasy (stare nazwy): `ESPI`, `PRICE_ALERTS`, `TECHNICAL`, `FUNDAMENTAL`, `AI_PICK`, `AI_VERDICT`, `VOLUME_SPIKES`, `CANDLESTICK_PATTERNS`, `PRICE_GAPS`, `DIVERGENCES`, `MA_CROSSOVERS`, `SUPPORT_BOUNCES`, `CALENDAR_EVENTS`, `KNF_SHORTS`, `RECOMMENDATIONS`, `MARKET_ACTIVITY`, `MARKET_REGIME`, `REGIME`, `WEEKEND_NASDAQ`, `NASDAQ_WEEKEND`, `MORNING_BRIEF` i ich warianty w liczbie pojedynczej.
 
 ## Przyklady CLI
 
