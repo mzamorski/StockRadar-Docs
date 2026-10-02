@@ -984,7 +984,7 @@ Pobiera i klasyfikuje rekomendacje analityczne z BiznesRadar dla GPW oraz Yahoo 
 
 **Dane:** BiznesRadar i Yahoo Finance/Benzinga (cache 1h), cele cenowe
 
-Źródła ustawia lista `modules.ALERT_RECOMMENDATIONS.sources`; obsługiwane wartości to `biznesradar` i `yahoo`. Dla Yahoo parametr `yahoo_lookback_days` określa ponownie sprawdzane okno historii (domyślnie 7 dni), co pozwala uzupełnić zdarzenia opublikowane podczas przerwy aplikacji. Polling Yahoo odbywa się tylko dla tickerów `.US`. Trwały `source_record_key` oraz kanoniczny fingerprint chronią przed powtórnym zapisem i alertem po restarcie procesu.
+Źródła ustawia lista `modules.ALERT_RECOMMENDATIONS.sources`; obsługiwane wartości to `biznesradar` i `yahoo`. `import_all_recommendations` (domyślnie `true`) zapisuje do bazy także rekomendacje BiznesRadar dla spółek spoza skonfigurowanej watchlisty; ustawienie `false` ogranicza import do aktualnie analizowanych tickerów. Alerty nadal dotyczą wyłącznie analizowanych spółek. Dla Yahoo parametr `yahoo_lookback_days` określa ponownie sprawdzane okno historii (domyślnie 7 dni), co pozwala uzupełnić zdarzenia opublikowane podczas przerwy aplikacji. Polling Yahoo odbywa się tylko dla tickerów `.US`. Trwały `source_record_key` oraz kanoniczny fingerprint chronią przed powtórnym zapisem i alertem po restarcie procesu.
 
 Klasyfikacja rekomendacji:
 
