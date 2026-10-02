@@ -1169,29 +1169,62 @@ W `config.yaml` moduł ma `execution_mode: manual`. Taki moduł nie wymaga `inte
 
 Liczy dwa własne, informacyjne wskaźniki kondycji rynku w skali 0–100:
 
-- 🇺🇸 **US Market Regime Score** — Trend/Breadth 40%, Volatility/Stress 25%, Credit/Liquidity 20%, Risk Appetite 15%.
-- 🇵🇱 **GPW Market Regime Score** — Breadth 45%, Trend 25%, Participation 15%, Activity/Vol 15%.
+- 🇺🇸 **US Market Regime Score** — Trend/Breadth 30%, Volatility/Stress 20%, Credit/Liquidity 15%, Risk Appetite 15%, Rates/Macro Stress 20%.
+- 🇵🇱 **GPW Market Regime Score** — Breadth 35%, Trend 20%, Participation 15%, Activity/Vol 15%, Macro/FX 15%.
 
 `100` oznacza szeroki, zdrowy risk-on, a `0` silny risk-off/stres. Wynik jest raportowany
 razem ze składowymi oraz flagami diagnostycznymi, m.in. `ATH_NARROW_RALLY`,
 `BREADTH_DIVERGENCE`, `VOLATILITY_STRESS`, `CREDIT_STRESS`,
-`SMALL_CAP_WEAKNESS`, `BROAD_RALLY` i `RECOVERING`.
+`RATES_STRESS`, `MACRO_FX_STRESS`, `SMALL_CAP_WEAKNESS`, `BROAD_RALLY`
+i `RECOVERING`.
 
 Dla USA szerokość rynku jest liczona na stałym koszyku dużych, płynnych spółek,
 a szerokość poza megacapami jest dodatkowo kontrolowana przez relacje `RSP/SPY`
 i `IWM/SPY`. Stres zmienności wykorzystuje VIX i, gdy dane są dostępne, relację
-VIX/VIX3M. Credit wykorzystuje `HYG/LQD`.
+VIX/VIX3M. Credit wykorzystuje `HYG/LQD`. Nowy komponent `Rates / Macro Stress`
+wykorzystuje dane FRED: nominalną rentowność US 10Y (`DGS10`), realną 10Y
+(`DFII10`), krzywą 10Y–2Y (`DGS10-DGS2`) oraz szeroki indeks dolara
+(`DTWEXBGS`). Szybki wzrost rentowności, wysokie realne stopy i mocny dolar
+obniżają wynik.
 
 Dla GPW silnik wykorzystuje szeroki koszyk z `TECH_MARKET_BREADTH`, ale wynik jest
-rozszerzony o trend benchmarku, relatywne uczestnictwo mWIG/sWIG wobec WIG20 oraz
-realized volatility i kierunkowy dollar-volume. Stary `TECH_MARKET_BREADTH` pozostaje
-dostępny zgodnościowo, lecz w domyślnej konfiguracji jest wyłączony, aby nie dublować
-raportu.
+rozszerzony o trend benchmarku, relatywne uczestnictwo mWIG/sWIG wobec WIG20,
+realized volatility i kierunkowy dollar-volume. `Macro / FX` łączy kondycję USD/PLN
+z globalnym komponentem stóp z rynku USA, dzięki czemu score GPW uwzględnia również
+zewnętrzne warunki finansowe. Stary `TECH_MARKET_BREADTH` pozostaje dostępny
+zgodnościowo, lecz w domyślnej konfiguracji jest wyłączony, aby nie dublować raportu.
 
 Składowe o naturalnej skali rynkowej są normalizowane historycznym percentylem
 (domyślnie do 756 sesji); breadth zachowuje również bezpośredni poziom `% > SMA50`,
 `% > SMA200` i udział wzrostów. Dzięki temu score reaguje na zmianę reżimu bez
 sztywnych progów typu „VIX 20 = strach”.
+
+CNN Fear & Greed pozostaje osobnym, zewnętrznym benchmarkiem sentymentu i nie jest
+wejściem do Market Regime Score. Web v2 pokazuje go w oddzielnym panelu obok
+surowych danych o stopach i dolarze.
+
+Web v2 zawiera również **historyczną walidację Market Regime v2**. Silnik pobiera
+około 10 lat danych, aby uzyskać pełny warm-up dla historycznych percentyli, a następnie
+ocenia do 6 lat score dzień po dniu bez używania przyszłych danych. Dla każdego dnia
+liczone są forward returns 5/20/60/120 sesji, przyszły max drawdown i realized volatility.
+
+Walidacja wag używa purged walk-forward: około 756 sesji train, 126 sesji test oraz
+purge równy najdłuższemu horyzontowi forward. Kandydaci wag są ograniczeni do małego
+otoczenia wag domenowych i wybierani wyłącznie na train pod kątem separacji przyszłego
+drawdownu 20D/60D; wynik jest oceniany na niewidzianym teście. Obok pozostają porównania
+z wagami bieżącymi i equal-weight. Moving-block bootstrap wyznacza 95% przedziały
+ufności dla nakładających się forward windows, a tail-risk validation porównuje częstość
+drawdownu >=5%/20D oraz >=10%/60D dla niskiego i wysokiego score.
+
+UI celowo pokazuje najpierw prosty blok **dla inwestora**: ocenę wiarygodności filtra
+ryzyka 0–100, siłę filtra ryzyka, ocenę bieżących wag oraz prosty opis tail-risk.
+Korelacje, bootstrap CI, foldy walk-forward, stabilność komponentów i leave-one-out
+są dostępne po rozwinięciu danych technicznych. Wagi v2 nie są zmieniane automatycznie
+na podstawie tej samej walidacji.
+
+Pierwsza wersja walidacji breadth korzysta z aktualnego skonfigurowanego universe spółek,
+więc raport jawnie oznacza ograniczenie survivorship bias. Dane FRED są historycznymi
+seriami bieżącymi, a nie vintages z ALFRED.
 
 Codzienny snapshot jest zapisywany do `market_regime_snapshots`. Dane mają służyć
 do późniejszej walidacji OOS; `REPORT_MARKET_REGIME` nie tworzy sygnału BUY/SELL
