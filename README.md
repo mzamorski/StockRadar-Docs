@@ -113,6 +113,24 @@ System zawiera interaktywny dashboard Streamlit dostępny przez `src/app.py`.
 streamlit run src/app.py
 ```
 
+### ASP.NET Core Web v2 network access
+
+Run `web-v2.bat` to start Web v2 on `http://0.0.0.0:5090`. The browser
+opens `http://127.0.0.1:5090`; other devices use `http://<PC-LAN-IP>:5090`.
+Internet access requires an inbound Windows Firewall rule for TCP 5090 and,
+when behind a router, TCP port forwarding to the PC on port 5090. Python API
+stays on loopback with a dynamically selected port. Restart Web v2 after
+updating the launcher. Public deployments require authentication and HTTPS.
+
+For a shared demonstration, run `web-v2.bat -ReadOnly` (or
+`powershell -File scripts/web-v2.ps1 -ReadOnly`). ASP.NET rejects write methods
+with HTTP 403 and disables write controls in the UI. Gap radar, history,
+scorecard and profile endpoints are also blocked because these analyses may
+persist data. Viewing reports, the gap journal, filters and exports remains
+available. This mode applies to every visitor, including local users; internal
+data-provider caches may still be populated by permitted report reads. Restart
+without `-ReadOnly` to restore full access. This is not an authentication mode.
+
 ## Opis modułów i logika sygnałów
 
 Każdy moduł emituje sygnały widoczne w konsoli i opcjonalnie zapisuje je do tabeli `trade_signals`.
@@ -1304,7 +1322,10 @@ Domyślne źródła bez klucza API:
 - Hyperliquid `xyz:XYZ100`,
 - OKX `US100-USDT-SWAP`,
 - Kraken `PF_QQQXUSD` — perpetual oparty o QQQx (ekspozycja Nasdaq-100),
-- Paradex — automatyczne wyszukanie kontraktu perpetual zawierającego `US100`.
+- Paradex — automatyczne wyszukanie kontraktu perpetual zawierającego `US100`,
+- IG `Weekend US Tech 100` — publiczna strona rynku bez logowania; bieżący
+  midpoint powstaje z SELL/BUY, a lokalny anchor jest odtwarzany z publikowanego
+  przez IG `% Change`.
 
 Moduł działa fail-soft: awaria lub brak instrumentu u jednego providera nie
 blokuje pozostałych. Konsensus wymaga co najmniej `min_sources`. Miara
@@ -1323,6 +1344,15 @@ Snapshoty trafiają do `weekend_market_snapshots`, a wynik walidacji do
 NQ, błąd konsensusu w punktach procentowych oraz zgodność kierunku. Dane te są
 przeznaczone do późniejszej oceny jakości poszczególnych weekendów; moduł nie
 tworzy `trade_signals`.
+
+Web v2 udostępnia również ręczny backfill historii. Jeśli w SQLite nie ma
+historycznego `CONSENSUS`, StockRadar próbuje najpierw odtworzyć go dla
+ostatnich zakończonych weekendów z historycznych świec 5m Hyperliquid, OKX,
+Kraken i Paradex, używając stanu z niedzieli 17:55 ET, tuż przed otwarciem CME.
+IG nie uczestniczy w rekonstrukcji, ponieważ jego publiczna strona udostępnia
+tylko bieżący quote. Następnie brakujące walidacje są liczone na dokładnych
+danych `NQ=F` 5m z okresu `1mo`; weekendy bez dostępnych danych 5m są
+jawnie pomijane zamiast mieszać przybliżenia godzinowe z quality score.
 
 Przykład konfiguracji:
 
