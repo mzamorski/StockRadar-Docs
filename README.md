@@ -50,6 +50,7 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | `ALERT_ESPI` | Alert | informacyjny |
 | `ALERT_KNF_SHORT` | Alert | SHORT (zmiana pozycji) |
 | `ALERT_CALENDAR` | Alert | informacyjny |
+| `ALERT_MACRO_CALENDAR` | Alert rynkowy | high-impact makro; bez płatnego klucza API |
 | `REPORT_AI_RECOMMENDATIONS` | Raport (AI) | KUP / TRZYMAJ / OMIJAJ |
 | `REPORT_AI_DAILY_PICK` | Raport (AI) | pick dnia |
 | `REPORT_ANALYST_PICK` | Raport (źródło zewnętrzne) | BUY / SELL / HOLD |
@@ -57,6 +58,19 @@ i `res/` zawierają lokalne artefakty i nie są wersjonowane.
 | `REPORT_MARKET_REGIME` | Raport rynkowy | osobny score 0–100 dla USA i GPW |
 | `REPORT_MARKET_ACTIVITY` | Raport rynkowy | TOP N wg obrotu / wolumenu / RVOL |
 | `REPORT_WEEKEND_NASDAQ` | Raport rynkowy | weekendowy konsensus proxy Nasdaq + walidacja CME |
+
+### Kalendarz makro
+
+Moduł `ALERT_MACRO_CALENDAR` jest modułem `analysis_scope: market`.
+Nie wymaga płatnego klucza API. Primary providerem jest Yahoo Finance przez `yfinance.Calendars`, a fallbackiem oficjalny tygodniowy eksport JSON Forex Factory. Domyślnie StockRadar pobiera tylko zdarzenia `high-impact`
+dla USD, EUR i PLN i prezentuje czas w strefie `Europe/Warsaw`.
+
+Yahoo zwraca `Actual / Expected / Last / Revised`; wydarzenia oznaczone przez Yahoo gwiazdką `*` są traktowane jako `high-impact`. Forex Factory zapewnia fallback z `High / Medium / Low`, forecast i previous.
+
+Konfiguracja `economic_calendar` określa providera głównego, fallback,
+waluty, horyzont i `notify_before_minutes`. Scheduler zapisuje wydarzenia
+idempotentnie do `market_events`, loguje najbliższe publikacje na konsoli
+i może wysłać alert przed publikacją oraz po pojawieniu się `Actual`.
 
 ### Klasyfikacja mechanizmu generowania sygnałów
 
@@ -67,7 +81,7 @@ Na potrzeby analizy i porównywania skuteczności moduły oraz sygnały należy 
 | `HEURISTIC` | Deterministyczne reguły, progi, wagi i scoringi zdefiniowane w StockRadarze | moduły `TECH_*`, `FUND_OVERVIEW`, `FUND_SCORE_PIOTROSKI`, `FUND_EARNINGS_DRIFT`, `META_CONFLUENCE` |
 | `AI` | Werdykt lub wycena wygenerowana przez model AI | `META_AI_VERDICT`, `FUND_AI_FAIR_VALUE`, `REPORT_AI_RECOMMENDATIONS`, `REPORT_AI_DAILY_PICK` |
 | `EXTERNAL` | Decyzja człowieka albo zewnętrznego źródła, w tym sygnał zarejestrowany ręcznie | `REPORT_ANALYST_PICK`, rekomendacje analityczne, konta społecznościowe, sygnały manualne |
-| `INFORMATIONAL` | Rejestracja zdarzenia lub przekroczenia warunku bez właściwej prognozy inwestycyjnej | `ALERT_ESPI`, `ALERT_CALENDAR`, `ALERT_KNF_SHORT` oraz proste alerty cenowe |
+| `INFORMATIONAL` | Rejestracja zdarzenia lub przekroczenia warunku bez właściwej prognozy inwestycyjnej | `ALERT_ESPI`, `ALERT_CALENDAR`, `ALERT_MACRO_CALENDAR`, `ALERT_KNF_SHORT` oraz proste alerty cenowe |
 
 Określenie **moduły heurystyczne** jest poprawne dla modułów regułowych. Same wzory wskaźników i modeli, np. RSI, ADX, Piotroski F-Score, DCF lub EPV, są obliczeniami ilościowymi; heurystyczna jest ich interpretacja poprzez ustalone progi, punkty i wagi prowadzące do sygnału `BUY`, `SELL` lub `HOLD`.
 
