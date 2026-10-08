@@ -1966,7 +1966,7 @@ Aktualny raport referencyjny: [audyt skuteczności sygnałów z 2026-08-22](docs
 - Granica zapisu nowych sygnałów normalizuje ticker, moduł i sygnał, odrzuca ticker niebędący symbolem rynkowym oraz zapisuje niepoprawną cenę lub confidence spoza zakresu jako `NULL`. Nie wykonuje automatycznej korekty ani usuwania starych rekordów.
 - W panelu Web kierunek „Domyślne (Long + Short)” obejmuje wyłącznie sygnały kierunkowe z mapowania `backtest_criteria.signal_mapping`; neutralne `HOLD` nie są traktowane jak transakcje long.
 - Backtest domyślnie pomija sygnały, dla których pełny horyzont jeszcze nie upłynął. Jawna flaga `--backtest-allow-incomplete-horizons` włącza wycenę mark-to-market ostatnim dostępnym kursem; takie rekordy są oznaczone `is_horizon_complete=false` i zawierają rzeczywisty `actual_holding_days`.
-- Domyślne wejście następuje po sygnale, na zamknięciu następnej dostępnej sesji. Docelowy horyzont jest liczony od faktycznej daty wejścia, a wyjście po pierwszym dostępnym zamknięciu w dniu docelowym lub później.
+- Domyślne wejście następuje po sygnale, na zamknięciu następnej dostępnej sesji. Docelowy horyzont jest liczony od faktycznej daty wejścia, a wyjście po pierwszym dostępnym zamknięciu w dniu docelowym lub później. Dzienne świece Yahoo zachowują daty **lokalnej sesji giełdowej** (bez konwersji północy do UTC), aby sesje GPW i USA nie przesuwały się na poprzedni dzień.
 - `directional_return_pct` jest zwrotem brutto zgodnym z kierunkiem sygnału. `net_directional_return_pct` odejmuje ustawiony koszt round-trip i jest podstawą metryk decyzyjnych.
 - `profit_probability_pct` odpowiada na pytanie, jaki odsetek transakcji zakończył się wynikiem netto powyżej zera. `win_rate_pct` oznacza odsetek transakcji, które przekroczyły `--backtest-success-threshold`; przy progu `3%` zysk `+2%` netto jest więc transakcją zyskowną, ale nie jest trafieniem celu.
 - Ranking modułów jest liczony osobno dla każdego horyzontu na wszystkich zakończonych wynikach danego horyzontu. Małe próby pozostają widoczne, ale poniżej `min_ranking_trades` nie otrzymują miejsca. Kolejność kwalifikujących się modułów opiera się najpierw na dolnej granicy 95% przedziału średniego zwrotu netto, a następnie na dolnej granicy szansy zysku i liczbie transakcji.
@@ -1991,7 +1991,9 @@ Pliki CSV po eksporcie backtestu:
 
 - `backtest_results.csv` - wszystkie transakcje wynikowe (`outcomes`)
 - `backtest_results_summary.csv` - podsumowanie skutecznosci per horyzont
-- `backtest_results_by_module.csv` - statystyki modułów per horyzont
+- `backtest_results_by_module.csv` - statystyki modułów per horyzont (BUY i SELL łącznie)
+- `backtest_results_by_module_direction.csv` - statystyki `ALL`, `LONG`, `SHORT` (ewentualnie `NEUTRAL`) per moduł i horyzont; kierunek ustalany z kanonicznego `signal`
+- `backtest_results_opposing_signal_overlaps.csv` - audyt nakładających się przeciwnych sygnałów z tej samej spółki, modułu i horyzontu. To diagnostyka niezależnych prognoz; backtest **nie** symuluje zamykania pozycji przy zmianie kierunku.
 - `backtest_results_module_ranking.csv` - historyczny przekrojowy ranking ogólny, zachowany dla zgodności eksportu; do decyzji używaj rankingu per horyzont
 - `backtest_results_module_ranking_by_horizon.csv` - decyzyjny ranking modułów osobno dla każdego horyzontu, z metrykami netto, przedziałami 95% i oceną wiarygodności próby
 - `backtest_results_matched_horizon_outcomes.csv` - transakcje ze wspólnej kohorty zakończonej we wszystkich wybranych horyzontach
